@@ -8,12 +8,16 @@ import ssl
 import traceback
 import base64
 
+try:
+    from urllib.parse import urlparse
+    from urllib.parse import urlencode
+except:
+    from urlparse import urlparse
+    from urllib import urlencode
 from queue import Queue, Empty
 from multiprocessing.dummy import Pool
 from time import time
-from urlparse import urlparse
 from copy import copy
-from urllib import urlencode
 from threading import Thread
 
 import requests
