@@ -142,12 +142,12 @@ class FcoinRestApi(object):
             post = ''
         
         msg = method + path + timestamp + post
-        msg = base64.b64encode(msg)
+        msg = base64.b64encode(msg.encode())
         
-        signature = hmac.new(self.apiSecret, msg, digestmod=hashlib.sha1).digest()
+        signature = hmac.new(self.apiSecret.encode(), msg, digestmod=hashlib.sha1).digest()
         signature = base64.b64encode(signature)
         
-        return signature
+        return signature.decode()
     
     #----------------------------------------------------------------------
     def onError(self, code, error):
