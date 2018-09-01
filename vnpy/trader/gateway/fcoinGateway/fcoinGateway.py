@@ -209,8 +209,8 @@ class RestApi(FcoinRestApi):
             'symbol': orderReq.symbol,
             'side': directionMap[orderReq.direction],
             'type': priceTypeMap[orderReq.priceType],
-            'price': orderReq.price,
-            'amount': orderReq.volume
+            'price': format(orderReq.price, '.8f'),
+            'amount': format(orderReq.volume, '.2f')
         }
         
         reqid = self.addReq('POST', '/orders', self.onSendOrder, postdict=req)
