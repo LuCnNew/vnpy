@@ -59,7 +59,7 @@ class CcxtGateway(VtGateway):
     def connect(self):
         """连接"""
         try:
-            f = file(self.filePath)
+            f = open(self.filePath)
         except IOError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
@@ -152,6 +152,13 @@ class CcxtGateway(VtGateway):
 
 
 ########################################################################
+def onIfValueIsNone(data, name):
+    if data[name] == None:
+        return 0
+    else:
+        return data[name]
+
+
 class CcxtApi(object):
     """REST API实现"""
 
@@ -482,13 +489,19 @@ class CcxtApi(object):
         """"""
         symbol = data['symbol']
         tick = self.getTick(symbol)
-        
-        tick.openPrice = float(data['open'])
-        tick.highPrice = float(data['high'])
-        tick.lowPrice = float(data['low'])
-        tick.lastPrice = float(data['close'])
-        tick.volume = float(data['quoteVolume'])
-        
+
+        # tick.openPrice = float(data['open'])
+        # tick.highPrice = float(data['high'])
+        # tick.lowPrice = float(data['low'])
+        # tick.lastPrice = float(data['close'])
+        # tick.volume = float(data['quoteVolume'])
+
+        tick.openPrice = float(onIfValueIsNone(data, 'open'))
+        tick.highPrice = float(onIfValueIsNone(data, 'high'))
+        tick.lowPrice = float(onIfValueIsNone(data, 'low'))
+        tick.lastPrice = float(onIfValueIsNone(data, 'close'))
+        tick.volume = float(onIfValueIsNone(data, 'quoteVolume'))
+
         if data['timestamp']:
             tick.datetime = datetime.fromtimestamp(data['timestamp']/1000)
         else:
@@ -499,7 +512,9 @@ class CcxtApi(object):
         # 只有订阅了深度行情才推送
         if tick.bidPrice1:
             self.gateway.onTick(tick)
-    
+
+
+
     #----------------------------------------------------------------------
     def onQryDepth(self, data, reqid):
         """"""

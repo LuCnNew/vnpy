@@ -58,6 +58,5 @@ build/Makefile
 .python-version
 .gitignore
 
-
-
-
+# shifeng 添加
+vnpy.egg-info/
