@@ -107,7 +107,7 @@ class CointigerGateway(VtGateway):
         if self.qryEnabled:
             self.qryFunctionList = [
                                     self.restApi.qryMarketData,
-                                    # self.restApi.qryAccount,
+                                    self.restApi.qryAccount,
                                     self.restApi.qryOrderNewSubmitted,
                                     self.restApi.qryOrderPartialFilled,
                                     self.restApi.qryOrderCanceled,
@@ -364,7 +364,6 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def qryAccount(self):
         """"""
-        # Temporarily unrealized
         for symbol in self.symbols:
             req = {'api_key': self._api_key,
                    'time': int(time.time())
@@ -515,21 +514,21 @@ class RestApi(CointigerRestApi):
 
                 self.gateway.onTrade(trade)
 
-    #!!! unrealized----------------------------------------------------------------------
+    #----------------------------------------------------------------------
     def onQryAccount(self, data, f):
         """"""
-        asset = data['data']
+        # asset = data['data']
 
-        # for currency in asset.keys():
-        #     account = VtAccountData()
-        #     account.gatewayName = self.gatewayName
-        #
-        #     account.accountID = currency
-        #     account.vtAccountID = '.'.join([self.gatewayName, account.accountID])
-        #     account.balance = float(asset[currency])
-        #     account.available = float(free[currency])
-        #
-        #     self.gateway.onAccount(account)
+        for d in data['data']:
+            account = VtAccountData()
+            account.gatewayName = self.gatewayName
+
+            account.accountID = d['coin']
+            account.vtAccountID = '.'.join([self.gatewayName, account.accountID])
+            account.balance = float(d['normal'])
+            account.available = float(float(d['normal']) - float(d['lock']))
+
+            self.gateway.onAccount(account)
 
     #----------------------------------------------------------------------
     def onQryContract(self, data, reqid):
