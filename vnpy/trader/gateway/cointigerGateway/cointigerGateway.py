@@ -366,9 +366,6 @@ class RestApi(CointigerRestApi):
         """"""
         # Temporarily unrealized
         for symbol in self.symbols:
-            # note: there dont give the explicit symbol because you can only input coin rather than symbol--> eg: coin:ptt  symbol:ptteth
-            # you can get all coin by dont input coin, then handle the output(a dict) in onQryAccount to get what coin` account you want
-
             req = {'api_key': self._api_key,
                    'time': int(time.time())
                    }
@@ -523,16 +520,16 @@ class RestApi(CointigerRestApi):
         """"""
         asset = data['data']
 
-        for currency in asset.keys():
-            account = VtAccountData()
-            account.gatewayName = self.gatewayName
-
-            account.accountID = currency
-            account.vtAccountID = '.'.join([self.gatewayName, account.accountID])
-            account.balance = float(asset[currency])
-            account.available = float(free[currency])
-
-            self.gateway.onAccount(account)
+        # for currency in asset.keys():
+        #     account = VtAccountData()
+        #     account.gatewayName = self.gatewayName
+        #
+        #     account.accountID = currency
+        #     account.vtAccountID = '.'.join([self.gatewayName, account.accountID])
+        #     account.balance = float(asset[currency])
+        #     account.available = float(free[currency])
+        #
+        #     self.gateway.onAccount(account)
 
     #----------------------------------------------------------------------
     def onQryContract(self, data, reqid):
