@@ -4,17 +4,17 @@
 vnpy.api.cointiger的gateway接入
 '''
 
+
 from __future__ import print_function
 
-import sys
-import os
+import requests
 import json
-from vnpy.api.cointiger.vncointiger import CointigerRestApi
+from vnpy.api.cointiger import CointigerRestApi
 from datetime import datetime
 from copy import copy
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
-
+import numpy
 
 directionMap = {}
 directionMap[DIRECTION_LONG] = 'buy'
@@ -23,18 +23,17 @@ directionMapReverse = {v:k for k,v in directionMap.items()}
 
 statusMapReverse = {}
 statusMapReverse[0] = STATUS_NOTTRADED
-statusMapReverse[1] = STATUS_PARTTRADED
+statusMapReverse[1] = STATUS_NOTTRADED
 statusMapReverse[2] = STATUS_ALLTRADED
-statusMapReverse[4] = STATUS_UNKNOWN
-statusMapReverse[-1] = STATUS_CANCELLED
-
+statusMapReverse[3] = STATUS_PARTTRADED
+statusMapReverse[4] = STATUS_CANCELLED
 
 ########################################################################
 class CointigerGateway(VtGateway):
     """COINTIGER接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName=''):
+    def __init__(self, eventEngine, gatewayName='', config_dict= None):
         """Constructor"""
         super(CointigerGateway, self).__init__(eventEngine, gatewayName)
 
@@ -42,11 +41,15 @@ class CointigerGateway(VtGateway):
 
         self.qryEnabled = False         # 是否要启动循环查询
 
-        self.fileName = self.gatewayName + '_connect.json'
-        self.filePath = getJsonPath(self.fileName, __file__)
-        print("222")
+        if config_dict == None:
+            self.fileName = self.gatewayName + '_connect.json'
+            self.filePath = getJsonPath(self.fileName, __file__)
+        else:
+            self.fileName = config_dict['file_name']
+            self.filePath = getJsonPath(self.fileName, __file__)
 
-    #----------------------------------------------------------------------
+
+            #----------------------------------------------------------------------
     def connect(self):
         """连接"""
         try:
@@ -100,12 +103,18 @@ class CointigerGateway(VtGateway):
     #----------------------------------------------------------------------
     def initQuery(self):
         """初始化连续查询"""
+
         if self.qryEnabled:
+            self.qryFunctionList = [
+                                    self.restApi.qryMarketData,
+                                    # self.restApi.qryAccount,
+                                    self.restApi.qryOrderNewSubmitted,
+                                    self.restApi.qryOrderPartialFilled,
+                                    self.restApi.qryOrderCanceled,
+                                    self.restApi.qryOrderFilled,
+                                    self.restApi.qryOrderExpired]
+            # ]
             # 需要循环的查询函数列表
-            self.qryFunctionList = [self.restApi.qryAccount,
-                                    self.restApi.qryWorkingOrder,
-                                    self.restApi.qryCompletedOrder,
-                                    self.restApi.qryMarketData]
 
             self.qryCount = 0           # 查询触发倒计时
             self.qryTrigger = 1         # 查询触发点
@@ -141,6 +150,42 @@ class CointigerGateway(VtGateway):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
 
+    def get_depth(self, symbol, number):
+        """创建一个查询深度函数,以供对敲左右手策略使用"""
+        type = 'step0'
+        api_url = 'https://api.cointiger.pro/exchange/trading/api'
+        url = '{0}/market/depth?symbol={1}&type={2}'.format(api_url, symbol, type)
+        # r = requests.request('GET', url, params=params)
+        resultBids = []
+        resultAsks = []
+        with requests.Session() as session:
+            data = session.get(url).json()
+            if data:
+                if data.get('code', None) == '0':
+
+                    # Stitching orderbook format
+                    bids = data['data']['depth_data']['tick']['buys']
+                    for i in range(0, len(bids)):
+                        a = float(bids[i][0])
+                        bids[i][0] = a
+                        bids[i][1] = int(bids[i][1])
+                        resultBids.append(bids[i])
+                    asks = data['data']['depth_data']['tick']['asks']
+                    for k in range(0, len(asks)):
+                        b = float(asks[k][0])
+                        asks[k][0] = b
+                        asks[k][1] = int(asks[k][1])
+                        resultAsks.append(asks[k])
+                    d = {}
+                    d['bids'] = resultBids
+                    d['asks'] = resultAsks
+                    return d
+                else:
+                    return data
+            else:
+                return {}
+
+
 ########################################################################
 class RestApi(CointigerRestApi):
     """REST API实现"""
@@ -163,6 +208,8 @@ class RestApi(CointigerRestApi):
 
         self.tickDict = {}          # symbol:tick
         self.reqSymbolDict = {}
+
+        self.workingOrderDict = []
 
     #----------------------------------------------------------------------
     def connect(self, apiKey, apiSecret, symbols):
@@ -196,15 +243,17 @@ class RestApi(CointigerRestApi):
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
-
         req = {
             'symbol': orderReq.symbol,
-            'type': directionMap[orderReq.direction],
-            'price': orderReq.price,
-            'amount': orderReq.volume
+            'side': directionMap[orderReq.direction].upper(),
+            'price': str(round(orderReq.price, 8)),
+            'volume': str(int(orderReq.volume)),
+            'type': 1,
+            'time': (int)(time.time()),
+            'api_key': self._api_key
         }
 
-        reqid = self.addReq('POST', '/order', req, self.onSendOrder)
+        reqid = self.addReq('POST', '/v2/order?', req, self.onSendOrder)
 
         # 缓存委托数据对象
         order = VtOrderData()
@@ -231,45 +280,99 @@ class RestApi(CointigerRestApi):
         if localID in self.localSysDict:
             sysID = self.localSysDict[localID]
             order = self.orderDict[sysID]
+            '''
+            # v1 version cancel
             req = {
                 'symbol': order.symbol,
-                'order_id': sysID
+                'order_id': sysID,
+                'time': (int)(time.time()),
+                'api_key': self._api_key
             }
-            self.addReq('POST', '/order/batch_cancle', req, self.onCancelOrder)
+            self.addReq('DELETE', '/order', req, self.onCancelOrder)
+            '''
+
+            # v2 version cancel
+            req = {
+                'orderIdList': str({order.symbol: [str(sysID)]}),
+                'time': int(time.time()),
+                'api_key': self._api_key
+            }
+            self.addReq('POST', '/v2/order/batch_cancel', req, self.onCancelOrder)
         else:
             self.cancelDict[localID] = cancelOrderReq
 
     #----------------------------------------------------------------------
     def qryContract(self):
         """"""
-        self.addReq('GET', '/currencys', {}, self.onQryContract)
+        self.addReq('GET', '/v2/currencys', {}, self.onQryContract)
 
-    #----------------------------------------------------------------------
-    def qryCompletedOrder(self):
+    # ----------------------------------------------------------------------
+    def qryOrder(self, state):
         """"""
+        if self.workingOrderDict:
+            startOrder = numpy.min(self.workingOrderDict)
+        else:
+            startOrder = None
         for symbol in self.symbols:
             req = {
                 'symbol': symbol,
-                'current_page': '1',
-                'page_length': '100'
+                'states': state,
+                'time': int(time.time()),
+                'from': startOrder,
+                'api_key': self._api_key
             }
-            self.addReq('POST', '/orders_info_history.do', req, self.onQryOrder)
+            self.addReq('GET', '/v2/order/orders', req, self.onQryOrder)
+
+    # ----------------------------------------------------------------------
+    def qryOrderPartialFilled(self):
+        """"""
+        self.qryOrder('part_filled')
+
+    # ----------------------------------------------------------------------
+    def qryOrderNewSubmitted(self):
+        """"""
+        self.qryOrder('new')
+
+    # ----------------------------------------------------------------------
+    def qryOrderFilled(self):
+        """"""
+        self.qryOrder('filled')
+
+    # ----------------------------------------------------------------------
+    def qryOrderCanceled(self):
+        """"""
+        self.qryOrder('canceled')
+
+    # ----------------------------------------------------------------------
+    def qryOrderExpired(self):
+        """"""
+        self.qryOrder('expired')
+
 
     #----------------------------------------------------------------------
-    def qryWorkingOrder(self):
-        """"""
-        for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'current_page': '1',
-                'page_length': '100'
-            }
-            self.addReq('POST', '/orders_info_no_deal.do', req, self.onQryOrder)
+    # def qryWorkingOrder(self):
+    #     """"""
+    #     for symbol in self.symbols:
+    #         req = {
+    #             'symbol': symbol,
+    #             'time': int(time.time()),
+    #             'states': 'new',
+    #             'api_key': self._api_key
+    #         }
+    #         self.addReq('GET', '/v2/order/orders', req, self.onQryOrder)
 
     #----------------------------------------------------------------------
     def qryAccount(self):
         """"""
-        self.addReq('POST', '/user_info.do', {}, self.onQryAccount)
+        # Temporarily unrealized
+        for symbol in self.symbols:
+            # note: there dont give the explicit symbol because you can only input coin rather than symbol--> eg: coin:ptt  symbol:ptteth
+            # you can get all coin by dont input coin, then handle the output(a dict) in onQryAccount to get what coin` account you want
+
+            req = {'api_key': self._api_key,
+                   'time': int(time.time())
+                   }
+        self.addReq('GET', '/user/balance?', req, self.onQryAccount)
 
     #----------------------------------------------------------------------
     def qryDepth(self):
@@ -277,9 +380,9 @@ class RestApi(CointigerRestApi):
         for symbol in self.symbols:
             req = {
                 'symbol': symbol,
-                'size': '5'
+                'type': 'step0'
             }
-            i = self.addReq('GET', '/depth?', req, self.onQryDepth)
+            i = self.addReq('GET', '/market/depth?', req, self.onQryDepth)
             self.reqSymbolDict[i] = symbol
 
     #----------------------------------------------------------------------
@@ -301,11 +404,14 @@ class RestApi(CointigerRestApi):
         """"""
         order = self.reqOrderDict[reqid]
         localID = order.orderID
-        sysID = data['order_id']
+        sysID = data['data']['order_id']
+        # u need to remember the order_id that to cancel, and keep 2 element
+        self.workingOrderDict.append(sysID)
+        if(len(self.workingOrderDict) > 2):
+            self.workingOrderDict = self.workingOrderDict[2:]
 
         self.localSysDict[localID] = sysID
         self.orderDict[sysID] = order
-
         self.gateway.onOrder(order)
 
         # 发出等待的撤单委托
@@ -317,31 +423,34 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def onCancelOrder(self, data, reqid):
         """"""
-        pass
+        # process the data when a canceled action happend
+        self.writeLog(str(data))
+        # pass
 
     #----------------------------------------------------------------------
     def onError(self, code, error):
         """"""
-        msg = u'发生异常，错误代码：%s，错误信息：%s' %(code, error)
+        msg = u'发生异常，错误代码：%s，错误信息：%s' % (code, error)
         self.writeLog(msg)
 
     #----------------------------------------------------------------------
     def onQryOrder(self, data, reqid):
         """"""
-        if 'orders' not in data:
+        if 'data' not in data:
             return
 
-        if not isinstance(data['orders'], list):
+        if not isinstance(data['data'], list):
             return
 
-        data['orders'].reverse()
+        # data['data'].reverse()
 
-        for d in data['orders']:
+        for d in data['data']:
             orderUpdated = False
             tradeUpdated = False
 
-            # 获取委托对象
-            sysID = d['order_id']
+            # 获取所有委托对象(新单就是当前委托,当它撤销后就变成了历史委托了,所以这个单是被qry了多次的)
+            sysID = d['id']
+            # print(sysID)
             if sysID in self.orderDict:
                 order = self.orderDict[sysID]
             else:
@@ -349,7 +458,7 @@ class RestApi(CointigerRestApi):
                 order.gatewayName = self.gatewayName
 
                 order.symbol = d['symbol']
-                order.exchange = EXCHANGE_LBANK
+                order.exchange = EXCHANGE_COINTIGER
                 order.vtSymbol = '.'.join([order.symbol, order.exchange])
 
                 self.localID += 1
@@ -359,18 +468,17 @@ class RestApi(CointigerRestApi):
                 order.orderID = localID
                 order.vtOrderID = '.'.join([order.gatewayName, order.orderID])
 
-                order.direction = directionMapReverse[d['type']]
+                order.direction = directionMapReverse[d['type'].split('-')[0]]
                 order.price = float(d['price'])
-                order.totalVolume = float(d['amount'])
+                order.totalVolume = float(d['volume'])
 
-                dt = datetime.fromtimestamp(d['create_time']/1000)
+                dt = datetime.fromtimestamp(d['ctime'] / 1000)
                 order.orderTime = dt.strftime('%H:%M:%S')
 
                 self.orderDict[sysID] = order
                 orderUpdated = True
 
-            # 检查是否委托有变化
-            newTradedVolume = float(d['deal_amount'])
+            newTradedVolume = float(d['deal_volume'])
             newStatus = statusMapReverse[d['status']]
 
             if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
@@ -382,6 +490,7 @@ class RestApi(CointigerRestApi):
 
             order.tradedVolume = newTradedVolume
             order.status = newStatus
+            # print(newStatus)
 
             # 若有更新才推送
             if orderUpdated:
@@ -409,13 +518,10 @@ class RestApi(CointigerRestApi):
 
                 self.gateway.onTrade(trade)
 
-    #----------------------------------------------------------------------
-    def onQryAccount(self, data, reqid):
+    #!!! unrealized----------------------------------------------------------------------
+    def onQryAccount(self, data, f):
         """"""
-        info = data['info']
-        asset = info['asset']
-        free = info['free']
-        freeze = info['freeze']
+        asset = data['data']
 
         for currency in asset.keys():
             account = VtAccountData()
@@ -431,16 +537,21 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def onQryContract(self, data, reqid):
         """"""
-        for d in data:
+
+        for d in data["data"]["eth-partition"]:
             contract = VtContractData()
             contract.gatewayName = self.gatewayName
 
-            contract.symbol = str(d['symbol'])
-            contract.exchange = EXCHANGE_LBANK
+            # Stitching string like: eoseth , ptteth
+            s_base = str(d['baseCurrency'])
+            s_quote = str(d['quoteCurrency'])
+            contract.symbol = '{}{}'.format(s_base, s_quote)
+            # print(contract.symbol)
+            contract.exchange = EXCHANGE_COINTIGER
             contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
             contract.name = contract.vtSymbol
             contract.productClass = PRODUCT_SPOT
-            contract.priceTick = pow(10, -int(d['priceAccuracy']))
+            contract.priceTick = pow(10, -int(d['pricePrecision']))
             contract.size = 1
 
             self.gateway.onContract(contract)
@@ -450,21 +561,23 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def onQryTicker(self, data, reqid):
         """"""
-        ticker = data['ticker']
+        ticker = data['data']['trade_ticker_data']['tick']
 
         symbol = self.reqSymbolDict.pop(reqid)
         tick = self.tickDict[symbol]
 
         tick.highPrice = float(ticker['high'])
         tick.lowPrice = float(ticker['low'])
-        tick.lastPrice = float(ticker['latest'])
+        tick.closePrice = float(ticker['close'])
+        tick.openPrice = float(ticker['open'])
         tick.volume = float(ticker['vol'])
 
-        tick.datetime = datetime.fromtimestamp(int(data['timestamp']/1000))
+
+        tick.datetime = datetime.fromtimestamp(int(data['data']['trade_ticker_data']['ts']/1000))
         tick.date = tick.datetime.strftime('%Y%m%d')
         tick.time = tick.datetime.strftime('%H:%M:%S')
 
-        if tick.bidPrice1:
+        if tick.closePrice:
             self.gateway.onTick(copy(tick))
 
     #----------------------------------------------------------------------
@@ -473,8 +586,8 @@ class RestApi(CointigerRestApi):
         symbol = self.reqSymbolDict.pop(reqid)
         tick = self.tickDict[symbol]
 
-        bids = data['bids']
-        asks = data['asks']
+        bids = data['data']['depth_data']['tick']['buys']
+        asks = data['data']['depth_data']['tick']['asks']
 
         tick.bidPrice1, tick.bidVolume1 = bids[0]
         tick.bidPrice2, tick.bidVolume2 = bids[1]
@@ -482,12 +595,25 @@ class RestApi(CointigerRestApi):
         tick.bidPrice4, tick.bidVolume4 = bids[3]
         tick.bidPrice5, tick.bidVolume5 = bids[4]
 
+        # price is unicode type, need convert to float then you can make arithmetic
+        tick.bidPrice1 = float(tick.bidPrice1.encode("utf-8"))
+        tick.bidPrice2 = float(tick.bidPrice2.encode("utf-8"))
+        tick.bidPrice3 = float(tick.bidPrice3.encode("utf-8"))
+        tick.bidPrice4 = float(tick.bidPrice4.encode("utf-8"))
+        tick.bidPrice5 = float(tick.bidPrice5.encode("utf-8"))
+
         tick.askPrice1, tick.askVolume1 = asks[0]
         tick.askPrice2, tick.askVolume2 = asks[1]
         tick.askPrice3, tick.askVolume3 = asks[2]
         tick.askPrice4, tick.askVolume4 = asks[3]
         tick.askPrice5, tick.askVolume5 = asks[4]
 
-        if tick.lastPrice:
+        tick.askPrice1 = float(tick.askPrice1.encode("utf-8"))
+        tick.askPrice2 = float(tick.askPrice2.encode("utf-8"))
+        tick.askPrice3 = float(tick.askPrice3.encode("utf-8"))
+        tick.askPrice4 = float(tick.askPrice4.encode("utf-8"))
+        tick.askPrice5 = float(tick.askPrice5.encode("utf-8"))
+
+        if tick.bidPrice1:
             self.gateway.onTick(copy(tick))
 

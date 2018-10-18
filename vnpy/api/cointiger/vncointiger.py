@@ -2,16 +2,30 @@
 
 from __future__ import print_function
 try:
+    from urllib.parse import urlparse
     from urllib.parse import urlencode
 except:
+    from urlparse import urlparse
     from urllib import urlencode
+
+import urllib3
 import hashlib
 import requests
 from queue import Queue, Empty
 from multiprocessing.dummy import Pool
 import hmac
 
-REST_HOST = 'https://api.cointiger.pro/exchange/trading/api/v2'
+import json
+import websocket
+import time
+
+Trading_Macro_v2 = 'https://api.cointiger.pro/exchange/trading/api/v2'
+Trading_Macro = 'https://api.cointiger.pro/exchange/trading/api'
+Market_Macro = 'https://api.cointiger.pro/exchange/trading/api/market'
+Market_List = 'https://www.cointiger.pro/exchange/api/public/market/detail'
+Wss_Url = 'wss://api.cointiger.pro/exchange-market/ws'
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ########################################################################
 class CointigerRestApi(object):
@@ -58,11 +72,11 @@ class CointigerRestApi(object):
         """处理请求"""
         # 读取方法和参数
         method, path, params, callback, reqID = req
-        url = REST_HOST + path
+        url = Trading_Macro + path
 
-        # 在参数中增加必须的字段
-        params['_api_key'] = self._api_key
-        params['_secret'] = self.generateSignature(params)
+        # 在参数中增加必须的字段 (添加签名字段,其它字段都已在各自函数里添加)
+        params['sign'] = self.get_sign(params)
+        # print(params)
 
         # 发送请求
         payload = urlencode(params)
@@ -70,8 +84,8 @@ class CointigerRestApi(object):
         try:
             # 使用会话重用技术，请求延时降低80%
             session = self.sessionDict[i]
+            # print(url+payload)
             resp = session.request(method, url, params=payload)
-            #resp = requests.request(method, url, params=payload)
 
             code = resp.status_code
             d = resp.json()
@@ -79,8 +93,7 @@ class CointigerRestApi(object):
             if code == 200:
                 callback(d, reqID)
             else:
-                self.onError(code, str(d))
-
+                self.onError(code, d)
         except Exception as e:
             self.onError(type(e), e.message)
 
@@ -109,9 +122,9 @@ class CointigerRestApi(object):
         # 返回请求编号
         return self.reqID
 
-
     ##----------------------------------------------------------------------
-    def generateSignature(self, data):
+
+    def get_sign(self, data):
         if not isinstance(data, dict) or not self._secret:
             return ''
         string = ''
@@ -132,4 +145,3 @@ class CointigerRestApi(object):
     def onData(self, data, reqID):
         """"""
         print(data, reqID)
-
