@@ -95,6 +95,7 @@ EXCHANGE_BIGONE = 'BIGONE'       # BigOne比特币交易所
 EXCHANGE_COINBASE = 'COINBASE'   # Coinbase交易所
 EXCHANGE_BITHUMB = 'BITHUMB'     # Bithumb比特币交易所
 EXCHANGE_COINTIGER = 'COINTIGER' # Cointiger比特币交易所
+EXCHANGE_BCEX = 'BCEX' 	         # Bcex比特币交易所
 
 
 # 货币类型
