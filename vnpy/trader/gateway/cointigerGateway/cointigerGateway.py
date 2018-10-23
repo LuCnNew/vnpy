@@ -209,7 +209,7 @@ class RestApi(CointigerRestApi):
         self.tickDict = {}          # symbol:tick
         self.reqSymbolDict = {}
 
-        self.workingOrderDict = []
+        self.workingOrderDict = {}
 
     #----------------------------------------------------------------------
     def connect(self, apiKey, apiSecret, symbols):
@@ -240,6 +240,7 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """"""
+        self.workingOrderDict = {}
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
@@ -309,19 +310,16 @@ class RestApi(CointigerRestApi):
     # ----------------------------------------------------------------------
     def qryOrder(self, state):
         """"""
-        if self.workingOrderDict:
-            startOrder = numpy.min(self.workingOrderDict)
-        else:
-            startOrder = None
         for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'states': state,
-                'time': int(time.time()),
-                'from': startOrder,
-                'api_key': self._api_key
-            }
-            self.addReq('GET', '/v2/order/orders', req, self.onQryOrder)
+            for sysID in self.workingOrderDict:
+                req = {
+                    'symbol': symbol,
+                    'states': state,
+                    'time': int(time.time()),
+                    'from': sysID,
+                    'api_key': self._api_key
+                }
+                self.addReq('GET', '/v2/order/orders', req, self.onQryOrder)
 
     # ----------------------------------------------------------------------
     def qryOrderPartialFilled(self):
@@ -388,10 +386,13 @@ class RestApi(CointigerRestApi):
         order = self.reqOrderDict[reqid]
         localID = order.orderID
         sysID = data['data']['order_id']
+
         # u need to remember the order_id that to cancel, and keep 2 element
-        self.workingOrderDict.append(sysID)
-        if(len(self.workingOrderDict) > 2):
-            self.workingOrderDict = self.workingOrderDict[2:]
+        # self.workingOrderDict.append(sysID)
+        # if(len(self.workingOrderDict) > 2):
+        #     self.workingOrderDict = self.workingOrderDict[2:]
+
+        self.workingOrderDict[sysID] = order
 
         self.localSysDict[localID] = sysID
         self.orderDict[sysID] = order

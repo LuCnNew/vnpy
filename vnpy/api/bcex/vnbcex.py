@@ -94,6 +94,7 @@ class BcexRestApi(object):
 
             if code == 200:
                 if('orderInfo' in url):
+                    # if u qryorder, u need to tell onQryOrder this callback the order_id
                     callback(d, reqID, params['trust_id'])
                 else:
                     callback(d, reqID)

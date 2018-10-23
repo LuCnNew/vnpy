@@ -222,6 +222,7 @@ class RestApi(BcexRestApi):
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """"""
+        # u need to clear the workingOrderDict to maintain this Dict just have the order_id u send just now
         self.workingOrderDict = {}
         self.localID += 1
         orderID = str(self.localID)
