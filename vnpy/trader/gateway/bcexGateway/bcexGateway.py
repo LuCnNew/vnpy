@@ -17,6 +17,7 @@ from copy import copy
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
 from urllib.parse import urlencode
+import queue
 
 import numpy
 
@@ -190,7 +191,7 @@ class RestApi(BcexRestApi):
         self.tickDict = {}          # symbol:tick
         self.reqSymbolDict = {}
 
-        self.workingOrderDict = []
+        self.workingOrderDict = {}
 
     #----------------------------------------------------------------------
     def connect(self, apiKey, apiSecret, symbols):
@@ -221,6 +222,7 @@ class RestApi(BcexRestApi):
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """"""
+        self.workingOrderDict = {}
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
@@ -269,6 +271,8 @@ class RestApi(BcexRestApi):
         else:
             self.cancelDict[localID] = cancelOrderReq
 
+        # self.workingOrderDict.pop(sysID)
+
     #----------------------------------------------------------------------
     def qryContract(self):
         """"""
@@ -278,12 +282,13 @@ class RestApi(BcexRestApi):
     def qryOrder(self):
         """"""
         for symbol in self.symbols:
-            req = {
-                'api_key': self._api_key,
-                'symbol': symbol,
-                'type': 'all'
-            }
-            self.addReq('POST', '/trustList', req, self.onQryOrder)
+            for sysID in self.workingOrderDict:
+                req = {
+                    'api_key': self._api_key,
+                    'symbol': symbol,
+                    'trust_id': sysID
+                }
+                self.addReq('POST', '/orderInfo', req, self.onQryOrder)
 
     #----------------------------------------------------------------------
     def qryAccount(self):
@@ -325,12 +330,7 @@ class RestApi(BcexRestApi):
         localID = order.orderID
         sysID = data['data']['order_id']
 
-        '''
-        # u need to remember the order_id that to cancel, and keep 2 element
-        self.workingOrderDict.append(sysID)
-        if(len(self.workingOrderDict) > 2):
-            self.workingOrderDict = self.workingOrderDict[2:]
-        '''
+        self.workingOrderDict[sysID] = order
 
         self.localSysDict[localID] = sysID
         self.orderDict[sysID] = order
@@ -355,93 +355,99 @@ class RestApi(BcexRestApi):
         self.writeLog(msg)
 
     #----------------------------------------------------------------------
-    def onQryOrder(self, data, reqid):
+    def onQryOrder(self, data, reqid, trust_id = 0):
         """"""
-        if 'data' not in data:
+        # print("status:", data['data']['number'], data['data']['status'])
+
+        if 'data' not in data.keys():
             return
 
-        if not isinstance(data['data'], list):
-            return
+        # if not isinstance(data['data'], list):
+        #     return
 
-        data['data'].reverse()
+        # data['data'].reverse()
 
-        for d in data['data']:
-            orderUpdated = False
-            tradeUpdated = False
+        # for d in data['data']:
+        orderUpdated = False
+        tradeUpdated = False
 
-            # 获取所有委托对象
-            sysID = d['id']
-            # print(sysID)
-            if sysID in self.orderDict:
-                order = self.orderDict[sysID]
-            else:
-                order = VtOrderData()
-                order.gatewayName = self.gatewayName
+        # 获取所有委托对象
+        # sysID = d['id']
+        # for i in self.workingOrderDict:
 
-                coin_from = str(d['coin_from'].encode("utf-8"))
-                coin_to = str(d['coin_to'].encode("utf-8"))
-                order.symbol = str(coin_from + coin_to)
-                order.symbol = str(coin_from + '2' + coin_to)
+        sysID = trust_id
 
-                order.exchange = EXCHANGE_BCEX
-                order.vtSymbol = '.'.join([order.symbol, order.exchange])
+        # print(sysID)
+        if sysID in self.orderDict:
+            order = self.orderDict[sysID]
+        else:
+            order = VtOrderData()
+            order.gatewayName = self.gatewayName
 
-                self.localID += 1
-                localID = str(self.localID)
-                self.localSysDict[localID] = sysID
+            coin_from = str(data['data']['coin_from'])
+            coin_to = str(data['data']['coin_to'])
+            # order.symbol = str(coin_from + coin_to)
+            order.symbol = str(coin_from + '2' + coin_to)
 
-                order.orderID = localID
-                order.vtOrderID = '.'.join([order.gatewayName, order.orderID])
+            order.exchange = EXCHANGE_BCEX
+            order.vtSymbol = '.'.join([order.symbol, order.exchange])
 
-                # order.direction = directionMapReverse[d['type'].split('-')[0]]
-                order.price = float(d['price'].encode("utf-8"))
-                order.totalVolume = float(d['number'].encode("utf-8"))
+            self.localID += 1
+            localID = str(self.localID)
+            self.localSysDict[localID] = sysID
 
-                dt = datetime.fromtimestamp(int(d['created'].encode("utf-8")) / 1000)
-                order.orderTime = dt.strftime('%H:%M:%S')
+            order.orderID = localID
+            order.vtOrderID = '.'.join([order.gatewayName, order.orderID])
 
-                self.orderDict[sysID] = order
-                orderUpdated = True
+            # order.direction = directionMapReverse[d['type'].split('-')[0]]
+            order.price = float(data['data']['price'])
+            order.totalVolume = float(data['data']['number'])
 
-            newTradedVolume = float(d['number'].encode("utf-8")) - float(d['numberover'].encode("utf-8"))
-            newStatus = statusMapReverse[int(d['status'].encode("utf-8"))]
+            dt = datetime.fromtimestamp(int(d['created']) / 1000)
+            order.orderTime = dt.strftime('%H:%M:%S')
 
-            if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
-                orderUpdated = True
+            self.orderDict[sysID] = order
+            orderUpdated = True
 
-            if newTradedVolume != float(order.tradedVolume):
-                tradeUpdated = True
-                newVolume = newTradedVolume - order.tradedVolume
+        newTradedVolume = float(data['data']['numberdeal'])
+        newStatus = statusMapReverse[int(data['data']['status'])]
 
-            order.tradedVolume = newTradedVolume
-            order.status = newStatus
-            # print(newStatus)
+        if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
+            orderUpdated = True
 
-            # 若有更新才推送
-            if orderUpdated:
-                self.gateway.onOrder(order)
+        if newTradedVolume != float(order.tradedVolume):
+            tradeUpdated = True
+            newVolume = newTradedVolume - order.tradedVolume
 
-            if tradeUpdated:
-                # 推送成交
-                trade = VtTradeData()
-                trade.gatewayName = order.gatewayName
+        order.tradedVolume = newTradedVolume
+        order.status = newStatus
+        # print(newStatus)
 
-                trade.symbol = order.symbol
-                trade.vtSymbol = order.vtSymbol
+        # 若有更新才推送
+        if orderUpdated:
+            self.gateway.onOrder(order)
 
-                trade.orderID = order.orderID
-                trade.vtOrderID = order.vtOrderID
+        if tradeUpdated:
+            # 推送成交
+            trade = VtTradeData()
+            trade.gatewayName = order.gatewayName
 
-                self.tradeID += 1
-                trade.tradeID = str(self.tradeID)
-                trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
+            trade.symbol = order.symbol
+            trade.vtSymbol = order.vtSymbol
 
-                trade.direction = order.direction
-                trade.price = order.price
-                trade.volume = newTradedVolume
-                trade.tradeTime = datetime.now().strftime('%H:%M:%S')
+            trade.orderID = order.orderID
+            trade.vtOrderID = order.vtOrderID
 
-                self.gateway.onTrade(trade)
+            self.tradeID += 1
+            trade.tradeID = str(self.tradeID)
+            trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
+
+            trade.direction = order.direction
+            trade.price = order.price
+            trade.volume = newTradedVolume
+            trade.tradeTime = datetime.now().strftime('%H:%M:%S')
+
+            self.gateway.onTrade(trade)
 
     # ----------------------------------------------------------------------
     def onQryAccount(self, data, f):

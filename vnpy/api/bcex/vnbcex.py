@@ -93,7 +93,10 @@ class BcexRestApi(object):
             d = resp.json()
 
             if code == 200:
-                callback(d, reqID)
+                if('orderInfo' in url):
+                    callback(d, reqID, params['trust_id'])
+                else:
+                    callback(d, reqID)
             else:
                 self.onError(code, d)
         except Exception as e:
