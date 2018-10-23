@@ -240,7 +240,7 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """"""
-        self.workingOrderDict = {}
+        # self.workingOrderDict = {}
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
@@ -387,11 +387,6 @@ class RestApi(CointigerRestApi):
         localID = order.orderID
         sysID = data['data']['order_id']
 
-        # u need to remember the order_id that to cancel, and keep 2 element
-        # self.workingOrderDict.append(sysID)
-        # if(len(self.workingOrderDict) > 2):
-        #     self.workingOrderDict = self.workingOrderDict[2:]
-
         self.workingOrderDict[sysID] = order
 
         self.localSysDict[localID] = sysID
@@ -474,7 +469,9 @@ class RestApi(CointigerRestApi):
 
             order.tradedVolume = newTradedVolume
             order.status = newStatus
-            # print(newStatus)
+
+            if (d['status'] == '4'):
+                self.workingOrderDict.pop(sysID)
 
             # 若有更新才推送
             if orderUpdated:

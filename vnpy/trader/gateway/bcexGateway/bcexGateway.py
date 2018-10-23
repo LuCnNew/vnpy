@@ -223,7 +223,8 @@ class RestApi(BcexRestApi):
     def sendOrder(self, orderReq):
         """"""
         # u need to clear the workingOrderDict to maintain this Dict just have the order_id u send just now
-        self.workingOrderDict = {}
+        # self.workingOrderDict = {}
+
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
@@ -422,7 +423,10 @@ class RestApi(BcexRestApi):
 
         order.tradedVolume = newTradedVolume
         order.status = newStatus
-        # print(newStatus)
+
+        # delect the id in WorkingOrderDict after u qry it
+        if(data['data']['status'] == '3'):
+            self.workingOrderDict.pop(trust_id)
 
         # 若有更新才推送
         if orderUpdated:
