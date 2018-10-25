@@ -37,7 +37,7 @@ class LbankGateway(VtGateway):
     """LBANK接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName=''):
+    def __init__(self, eventEngine, gatewayName='', config_dict= None):
         """Constructor"""
         super(LbankGateway, self).__init__(eventEngine, gatewayName)
 
@@ -45,8 +45,12 @@ class LbankGateway(VtGateway):
 
         self.qryEnabled = False         # 是否要启动循环查询
 
-        self.fileName = self.gatewayName + '_connect.json'
-        self.filePath = getJsonPath(self.fileName, __file__)
+        if config_dict == None:
+            self.fileName = self.gatewayName + '_connect.json'
+            self.filePath = getJsonPath(self.fileName, __file__)
+        else:
+            self.fileName = config_dict['file_name']
+            self.filePath = getJsonPath(self.fileName, __file__)
 
     #----------------------------------------------------------------------
     def connect(self):
