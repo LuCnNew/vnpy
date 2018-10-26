@@ -22,8 +22,8 @@ directionMap[DIRECTION_SHORT] = 'sell'
 directionMapReverse = {v:k for k,v in directionMap.items()}
 
 statusMapReverse = {}
-statusMapReverse[0] = STATUS_NOTTRADED
 statusMapReverse[1] = STATUS_NOTTRADED
+# statusMapReverse[1] = STATUS_NOTTRADED
 statusMapReverse[2] = STATUS_ALLTRADED
 statusMapReverse[3] = STATUS_PARTTRADED
 statusMapReverse[4] = STATUS_CANCELLED
@@ -107,13 +107,14 @@ class CointigerGateway(VtGateway):
         if self.qryEnabled:
             self.qryFunctionList = [
                                     self.restApi.qryMarketData,
-                                    self.restApi.qryAccount,
-                                    self.restApi.qryOrderNewSubmitted,
-                                    self.restApi.qryOrderPartialFilled,
-                                    self.restApi.qryOrderCanceled,
-                                    self.restApi.qryOrderFilled,
-                                    self.restApi.qryOrderExpired]
-            # ]
+                                    self.restApi.qryOrder,
+                                    # self.restApi.qryOrderFilled,
+                                    # self.restApi.qryOrderCanceled,
+                                    # self.restApi.qryOrderNewSubmitted,
+                                    # self.restApi.qryOrderPartialFilled,
+                                    # self.restApi.qryOrderExpired,
+                                    self.restApi.qryAccount
+            ]
             # 需要循环的查询函数列表
 
             self.qryCount = 0           # 查询触发倒计时
@@ -240,7 +241,8 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """"""
-        # self.workingOrderDict = {}
+        self.workingOrderDict = {}
+
         self.localID += 1
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
@@ -308,18 +310,21 @@ class RestApi(CointigerRestApi):
         self.addReq('GET', '/v2/currencys', {}, self.onQryContract)
 
     # ----------------------------------------------------------------------
-    def qryOrder(self, state):
+    def qryOrder(self):
         """"""
         for symbol in self.symbols:
             for sysID in self.workingOrderDict:
                 req = {
+                    'api_key': self._api_key,
                     'symbol': symbol,
-                    'states': state,
-                    'time': int(time.time()),
-                    'from': sysID,
-                    'api_key': self._api_key
+                    'order_id': sysID,
+                    'time': int(time.time())
+                    # 'states': 'new,filled,canceled',
+                    # 'from': sysID,
+                    # 'direct': 'next',
                 }
-                self.addReq('GET', '/v2/order/orders', req, self.onQryOrder)
+                # print('req: ', req)
+                self.addReq('GET', '/v2/order/details', req, self.onQryOrder)
 
     # ----------------------------------------------------------------------
     def qryOrderPartialFilled(self):
@@ -415,89 +420,81 @@ class RestApi(CointigerRestApi):
     #----------------------------------------------------------------------
     def onQryOrder(self, data, reqid):
         """"""
-        if 'data' not in data:
-            return
+        # for d in data['data']:
+        orderUpdated = False
+        tradeUpdated = False
 
-        if not isinstance(data['data'], list):
-            return
+        # 获取所有委托对象(新单就是当前委托,当它撤销后就变成了历史委托了,所以这个单是被qry了多次的)
+        d = data['data']
+        sysID = d['id']
+        if sysID in self.orderDict:
+            order = self.orderDict[sysID]
+        else:
+            order = VtOrderData()
+            order.gatewayName = self.gatewayName
 
-        # data['data'].reverse()
+            order.symbol = d['symbol']
+            order.exchange = EXCHANGE_COINTIGER
+            order.vtSymbol = '.'.join([order.symbol, order.exchange])
 
-        for d in data['data']:
-            orderUpdated = False
-            tradeUpdated = False
+            self.localID += 1
+            localID = str(self.localID)
+            self.localSysDict[localID] = sysID
 
-            # 获取所有委托对象(新单就是当前委托,当它撤销后就变成了历史委托了,所以这个单是被qry了多次的)
-            sysID = d['id']
-            # print(sysID)
-            if sysID in self.orderDict:
-                order = self.orderDict[sysID]
-            else:
-                order = VtOrderData()
-                order.gatewayName = self.gatewayName
+            order.orderID = localID
+            order.vtOrderID = '.'.join([order.gatewayName, order.orderID])
 
-                order.symbol = d['symbol']
-                order.exchange = EXCHANGE_COINTIGER
-                order.vtSymbol = '.'.join([order.symbol, order.exchange])
+            order.direction = directionMapReverse[d['type'].split('-')[0]]
+            order.price = float(d['price'])
+            order.totalVolume = float(d['volume'])
 
-                self.localID += 1
-                localID = str(self.localID)
-                self.localSysDict[localID] = sysID
+            dt = datetime.fromtimestamp(d['ctime'] / 1000)
+            order.orderTime = dt.strftime('%H:%M:%S')
 
-                order.orderID = localID
-                order.vtOrderID = '.'.join([order.gatewayName, order.orderID])
+            self.orderDict[sysID] = order
+            orderUpdated = True
 
-                order.direction = directionMapReverse[d['type'].split('-')[0]]
-                order.price = float(d['price'])
-                order.totalVolume = float(d['volume'])
+        newTradedVolume = float(d['deal_volume'])
+        newStatus = statusMapReverse[d['status']]
 
-                dt = datetime.fromtimestamp(d['ctime'] / 1000)
-                order.orderTime = dt.strftime('%H:%M:%S')
+        if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
+            orderUpdated = True
 
-                self.orderDict[sysID] = order
-                orderUpdated = True
+        if newTradedVolume != float(order.tradedVolume):
+            tradeUpdated = True
+            newVolume = newTradedVolume - order.tradedVolume
 
-            newTradedVolume = float(d['deal_volume'])
-            newStatus = statusMapReverse[d['status']]
+        order.tradedVolume = newTradedVolume
+        order.status = newStatus
 
-            if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
-                orderUpdated = True
+        # if (d['status'] == 4):
+        #     self.workingOrderDict.pop(sysID)
 
-            if newTradedVolume != float(order.tradedVolume):
-                tradeUpdated = True
-                newVolume = newTradedVolume - order.tradedVolume
+        # 若有更新才推送
+        if orderUpdated:
+            self.gateway.onOrder(order)
 
-            order.tradedVolume = newTradedVolume
-            order.status = newStatus
+        if tradeUpdated:
+            # 推送成交
+            trade = VtTradeData()
+            trade.gatewayName = order.gatewayName
 
-            if (d['status'] == '4'):
-                self.workingOrderDict.pop(sysID)
+            trade.symbol = order.symbol
+            trade.vtSymbol = order.vtSymbol
 
-            # 若有更新才推送
-            if orderUpdated:
-                self.gateway.onOrder(order)
+            trade.orderID = order.orderID
+            trade.vtOrderID = order.vtOrderID
 
-            if tradeUpdated:
-                # 推送成交
-                trade = VtTradeData()
-                trade.gatewayName = order.gatewayName
+            self.tradeID += 1
+            trade.tradeID = str(self.tradeID)
+            trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
 
-                trade.symbol = order.symbol
-                trade.vtSymbol = order.vtSymbol
+            trade.direction = order.direction
+            trade.price = order.price
+            trade.volume = newTradedVolume
+            trade.tradeTime = datetime.now().strftime('%H:%M:%S')
 
-                trade.orderID = order.orderID
-                trade.vtOrderID = order.vtOrderID
-
-                self.tradeID += 1
-                trade.tradeID = str(self.tradeID)
-                trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
-
-                trade.direction = order.direction
-                trade.price = order.price
-                trade.volume = newTradedVolume
-                trade.tradeTime = datetime.now().strftime('%H:%M:%S')
-
-                self.gateway.onTrade(trade)
+            self.gateway.onTrade(trade)
 
     #----------------------------------------------------------------------
     def onQryAccount(self, data, f):
