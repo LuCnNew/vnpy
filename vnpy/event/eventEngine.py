@@ -8,7 +8,11 @@ from time import sleep
 from collections import defaultdict
 
 # 第三方模块
-from qtpy.QtCore import QTimer
+try:
+    from qtpy.QtCore import QTimer
+except:
+    # no need to load qt if use EventEngine2	
+    pass
 
 # 自己开发的模块
 from .eventType import *
