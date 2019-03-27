@@ -32,34 +32,6 @@ statusMapReverse[1] = STATUS_NOTTRADED
 statusMapReverse[2] = STATUS_PARTTRADED
 statusMapReverse[3] = STATUS_ALLTRADED
 
-secretKey = '''-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCvuoZj82Ab2+Ol
-T0dUhvjZ3tJA0umC0vvwidWoBRBQ8BPEcQJuL0I5cksDi1yXtr1yoGttSd0+Omj/
-+nnK/60tQgdya40tjWX7aY1MUIGsgXuog1nT2thO1VWNv9sXhdzQ5D84g3IrekHJ
-4p/DY08EMefahbQhT12kXIMRgx/QGOpzPgcsPDGs9BB5IN8qdeJaCMTlIyjN4T4T
-+P8KevqPUmoq13qLkMuFEnbpunKEbOvEOe9g0wzJ8v8cxh2HCqwNMLv0og8iBDDf
-b5nzTg7FPZdm45WxCpfy0evH+x7qUFhty8lqC1GTIyLE6YZ03dR5ZQWlXHwbQaTh
-kO6uF3YbAgMBAAECggEAc2Xc7PQcsA7FPoCCSgrcjk5Z6gHXIHcmxT3ulYjFvzD4
-+i5wNyVHquvYQPqaknKJlCWuhjVUWZIH89lrc5hVA/xxYX0pV7mcN+6HwI65qSva
-pb2kFpCHLbXAmfZcjOT2LiNFNPp01gJSA56T5b5oXEvdgs38jUdOKioqVCy0jnVH
-RP5r3N24I9me1aXeQLhwR+jr2mCJP6gWwfiA2lyfxyuKeKrc7tcRoG0YAu2iSEvv
-QIMalBBaPmIVgVfTcJOUXPAg7kq9F60fqMkZ96h//7Gmt1rxTbeOKXctTOOGMNsz
-WNOKNKxb6/Udrme/ZQ1mxLXu2ZQeusNGA3FXZiZbIQKBgQDfhm15GWDQSnQBFk7O
-Iqthz3hAhS3c9u9g+OUY/jlRYVKRLad3IehIkG7V8wh175TxiNGKyy/dCQl6PZkw
-Km/9daH/W+SP3OWab/jJjYZD1gOkMBoexhyxZbm5qJnNyNdJiJWbkrt4HQ5+sEPU
-9Nrh5h4iGT4l9MZgHlHnEx9JkQKBgQDJQmbS1EPGNlK3sYyMa3/bI4mcyQEL58hY
-+WoS3qEw23bAcFiT4GlX0KpDuQriP5cgBPdX9gmCMY96rf+T/zoCa1iqs5HAI/S+
-q7RmJK2/MPU7Z0SpykkVeMXamQ4azVGnrFJ1GeyiD+xQKfUrtF1Ex/ahTydh1We8
-SPOZcEkO6wKBgQClTFMOt/7JahXJbAbRGABnb7b898AH5TD3JHi/d9lJXlBh/kIW
-rqOJbg4Y+AYsuQULbWOQYVw++Fzi4kSzwt5YsLIhFoK7BN9iyyVPX/KHne/Jbq0S
-Tu2PHqwvKQi8jqbuwSvqBaPPWqWKeK1hAcYQQk3MZ6B3D0HYePOWj6SWkQKBgEwO
-wwsD2sUKfIIdIA9lBMGNEZFlyPZ11poBT9vntKThG2SoUGE6GrVsDxxezsUn4PXh
-ypO8UGWaUy26me6VMpf9d1mzWO5y6CgyfY9oZxzs5JBZe3JrFul9ZdAxrUnls+kY
-z2SfsnSgbd7xrEyi8ehvZT4ayrhHTNez/hNLguCXAoGAe1S4HhwBgRUpgeCUndo5
-hyC+P/1QkyqWRqTbtUmPpimuj4cW6SMTkPcfiF0csWLTLxumtelxp94kjKF9m5G+
-lYcxTJxUN3M5AK+SFlx5U56+KifHdus+86UTg+jUUE0YaaB1McEvJYk77k2A4SfW
-lqnnF9f+ILqo1O3MGP9A1eo=
------END PRIVATE KEY-----'''
 ########################################################################
 class BcexGateway(VtGateway):
     """BCEX接口"""
@@ -76,6 +48,8 @@ class BcexGateway(VtGateway):
         if config_dict == None:
             self.fileName = self.gatewayName + '_connect.json'
             self.filePath = getJsonPath(self.fileName, __file__)
+            self.secretFileName = self.gatewayName + '_secretkey.json'
+            self.secretFilePath = getJsonPath(self.secretFileName, __file__)
         else:
             self.fileName = config_dict['file_name']
             self.filePath = getJsonPath(self.fileName, __file__)
@@ -86,19 +60,19 @@ class BcexGateway(VtGateway):
         """连接"""
         try:
             f = open(self.filePath)
+            f_secretkey = open(self.secretFilePath)
         except IOError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
             log.logContent = u'读取连接配置出错，请检查'
             self.onLog(log)
             return
-
         # 解析json文件
         setting = json.load(f)
         try:
             apiKey = setting['apiKey']
             #secretKey = str(setting['secretKey'])
-
+            secretKey = f_secretkey.read()
             symbols = setting['symbols']
         except KeyError:
             log = VtLogData()
