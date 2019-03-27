@@ -378,7 +378,7 @@ class HuobiTradeApi(TradeApi):
 
         self.connectionStatus = False  # 连接状态
         # self.accountid = '5065491'
-        self.accountid = ''
+        self.accountid = '4547480'
 
         self.orderDict = {}  # 缓存委托数据的字典
         self.symbols = []  # 所有交易代码的字符串集合

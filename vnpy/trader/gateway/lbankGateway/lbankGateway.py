@@ -17,7 +17,8 @@ from copy import copy
 from vnpy.api.lbank import LbankRestApi, LbankWebsocketApi
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
-
+from urllib.parse import urlencode
+import requests
 
 directionMap = {}
 directionMap[DIRECTION_LONG] = 'buy'
@@ -108,10 +109,11 @@ class LbankGateway(VtGateway):
         """初始化连续查询"""
         if self.qryEnabled:
             # 需要循环的查询函数列表
-            self.qryFunctionList = [self.restApi.qryAccount,
-                                    self.restApi.qryWorkingOrder,
+            self.qryFunctionList = [#self.restApi.qryAccount,
+                                    #self.restApi.qryWorkingOrder,
                                     self.restApi.qryCompletedOrder,
-                                    self.restApi.qryMarketData]
+                                    #self.restApi.qryMarketData
+                                    ]
 
             self.qryCount = 0           # 查询触发倒计时
             self.qryTrigger = 1         # 查询触发点
@@ -146,6 +148,35 @@ class LbankGateway(VtGateway):
     def setQryEnabled(self, qryEnabled):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
+
+    # ----------------------------------------------------------------------
+    def get_depth(self, symbol, number):
+        """创建一个查询深度函数,以供对敲左右手策略使用"""
+
+        api_url = 'https://www.lbkex.net/v1/depth.do'
+
+        req = {
+            'symbol': 'ptt_eth',
+            'size': '5'
+        }
+
+        payload = urlencode(req)
+
+        try:
+            # 使用会话重用技术，请求延时降低80%
+            session = requests.Session()
+            resp = session.request('GET', api_url, params=payload)
+            data = resp.json()
+            print(data)
+
+            d = {}
+            d['asks'] = data['asks']
+            d['bids'] = data['bids']
+            return d
+
+        except Exception as e:
+            self.onError(type(e), e.message)
+
 
 
 ########################################################################
@@ -230,6 +261,17 @@ class RestApi(LbankRestApi):
         self.reqOrderDict[reqid] = order
 
         return vtOrderID
+    #----------------------------------------------------------------------
+
+    def qryDepth(self):
+        """"""
+        for symbol in self.symbols:
+            req = {
+                'symbol': symbol,
+                'size': '5'
+            }
+            i = self.addReq('GET', '/depth.do', req, self.onQryDepth)
+            self.reqSymbolDict[i] = symbol
 
     #----------------------------------------------------------------------
     def cancelOrder(self, cancelOrderReq):
@@ -281,15 +323,7 @@ class RestApi(LbankRestApi):
         self.addReq('POST', '/user_info.do', {}, self.onQryAccount)
 
     #----------------------------------------------------------------------
-    def qryDepth(self):
-        """"""
-        for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'size': '5'
-            }
-            i = self.addReq('GET', '/depth.do', req, self.onQryDepth)
-            self.reqSymbolDict[i] = symbol
+
 
     #----------------------------------------------------------------------
     def qryTicker(self):
@@ -303,7 +337,7 @@ class RestApi(LbankRestApi):
     def qryMarketData(self):
         """"""
         self.qryDepth()
-        self.qryTicker()
+        #self.qryTicker()
 
     #----------------------------------------------------------------------
     def onSendOrder(self, data, reqid):

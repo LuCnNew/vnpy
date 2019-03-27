@@ -5,17 +5,14 @@ vnpy.api.fcoin的gateway接入
 '''
 from __future__ import print_function
 
-import os
 import json
-import time
-import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from copy import copy
 from math import pow
 
 from vnpy.api.fcoin import FcoinRestApi, FcoinWebsocketApi
 from vnpy.trader.vtGateway import *
-from vnpy.trader.vtFunction import getJsonPath, getTempPath
+from vnpy.trader.vtFunction import getJsonPath
 
 # 委托状态类型映射
 statusMapReverse = {}
@@ -86,7 +83,7 @@ class FcoinGateway(VtGateway):
 
         # 创建行情和交易接口对象
         self.restApi.connect(apiKey, apiSecret, symbols)
-        self.wsApi.connect(apiKey, apiSecret, symbols)
+        #self.wsApi.connect(apiKey, apiSecret, symbols)
 
         # 初始化并启动查询
         self.initQuery()
@@ -117,7 +114,7 @@ class FcoinGateway(VtGateway):
         """初始化连续查询"""
         if self.qryEnabled:
             # 需要循环的查询函数列表
-            self.qryFunctionList = [self.restApi.qryPosition,
+            self.qryFunctionList = [#self.restApi.qryPosition,
                                     self.restApi.qryOrderSubmitted,
                                     self.restApi.qryOrderPartialFilled,
                                     self.restApi.qryOrderCanceled,
@@ -217,6 +214,7 @@ class RestApi(FcoinRestApi):
         }
 
         reqid = self.addReq('POST', '/orders', self.onSendOrder, postdict=req)
+
 
         # 缓存委托数据对象
         order = VtOrderData()
@@ -498,13 +496,14 @@ class WebsocketApi(FcoinWebsocketApi):
     # ----------------------------------------------------------------------
     def onData(self, data):
         """数据回调"""
-        type_ = data['type']
-        if 'hello' in type_:
-            self.subscribe()
-        elif 'ticker' in type_:
-            self.onTick(data)
-        elif 'depth' in type_:
-            self.onDepth(data)
+        if('type' in data):
+            type_ = data['type']
+            if 'hello' in type_:
+                self.subscribe()
+            elif 'ticker' in type_:
+                self.onTick(data)
+            elif 'depth' in type_:
+                self.onDepth(data)
 
     # ----------------------------------------------------------------------
     def onError(self, msg):

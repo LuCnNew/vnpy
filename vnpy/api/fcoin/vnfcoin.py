@@ -17,7 +17,6 @@ except:
 from queue import Queue, Empty
 from multiprocessing.dummy import Pool
 from time import time
-from copy import copy
 from threading import Thread
 
 import requests
@@ -120,7 +119,6 @@ class FcoinRestApi(object):
     def run(self, i):
         """连续运行"""
         self.sessionDict[i] = requests.Session()
-        
         while self.active:
             try:
                 req = self.queue.get(timeout=1)
@@ -254,7 +252,7 @@ if __name__ == '__main__':
     rest.init(API_KEY, API_SECRET)
     rest.start(3)
        
-    #rest.addReq('GET', '/accounts/balance', rest.onData)
+    # rest.addReq('GET', '/accounts/balance', rest.onData)
     
     # 查委托
     #states = ['submitted', 'partial_filled', 'partial_canceled', 
@@ -274,7 +272,7 @@ if __name__ == '__main__':
         'symbol': 'ethusdt',
         'side': 'buy',
         'type': 'limit',
-        'price': 300,
+        'price': 122,
         'amount': 0.01
     }    
     rest.addReq('POST', '/orders', rest.onData, postdict=req)

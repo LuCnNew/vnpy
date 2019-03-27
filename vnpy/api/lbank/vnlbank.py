@@ -5,7 +5,7 @@ try:
     from urllib.parse import urlencode
 except:
     from urllib import urlencode
-import hashlib
+
 import ssl
 import json
 import traceback
@@ -13,7 +13,6 @@ import requests
 from queue import Queue, Empty
 from threading import Thread
 from multiprocessing.dummy import Pool
-from time import time
 import websocket
 
 #官方API导入的包
@@ -26,8 +25,7 @@ from Crypto.Signature import PKCS1_v1_5
 
 
 
-#REST_HOST = "https://api.lbank.info/v1"
-REST_HOST="https://api.lbkex.com/v1"
+REST_HOST="https://www.lbkex.net/v1"
 WEBSOCKET_HOST = 'ws://api.lbank.info/ws'
 LBANK_ERROR_CODE = {
 
@@ -142,12 +140,13 @@ class LbankRestApi(object):
         params['sign'] = self.generateSignature(params)
 
         # 发送请求
-        payload = urlencode(params)
+
+        #print(url)
 
         try:
             # 使用会话重用技术，请求延时降低80%
             session = self.sessionDict[i]
-            resp = session.request(method, url, params=payload)
+            resp = session.request(method, url, params=params)
             #resp = requests.request(method, url, params=payload)
 
             code = resp.status_code

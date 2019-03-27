@@ -22,16 +22,44 @@ import queue
 import numpy
 
 directionMap = {}
-directionMap[DIRECTION_LONG] = 'buy'
-directionMap[DIRECTION_SHORT] = 'sale'
+directionMap[DIRECTION_LONG] = '1'
+directionMap[DIRECTION_SHORT] = '2'
 directionMapReverse = {v:k for k,v in directionMap.items()}
 
 statusMapReverse = {}
-statusMapReverse[0] = STATUS_NOTTRADED
-statusMapReverse[1] = STATUS_PARTTRADED
-statusMapReverse[2] = STATUS_ALLTRADED
-statusMapReverse[3] = STATUS_CANCELLED
+statusMapReverse[0] = STATUS_CANCELLED
+statusMapReverse[1] = STATUS_NOTTRADED
+statusMapReverse[2] = STATUS_PARTTRADED
+statusMapReverse[3] = STATUS_ALLTRADED
 
+secretKey = '''-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCvuoZj82Ab2+Ol
+T0dUhvjZ3tJA0umC0vvwidWoBRBQ8BPEcQJuL0I5cksDi1yXtr1yoGttSd0+Omj/
++nnK/60tQgdya40tjWX7aY1MUIGsgXuog1nT2thO1VWNv9sXhdzQ5D84g3IrekHJ
+4p/DY08EMefahbQhT12kXIMRgx/QGOpzPgcsPDGs9BB5IN8qdeJaCMTlIyjN4T4T
++P8KevqPUmoq13qLkMuFEnbpunKEbOvEOe9g0wzJ8v8cxh2HCqwNMLv0og8iBDDf
+b5nzTg7FPZdm45WxCpfy0evH+x7qUFhty8lqC1GTIyLE6YZ03dR5ZQWlXHwbQaTh
+kO6uF3YbAgMBAAECggEAc2Xc7PQcsA7FPoCCSgrcjk5Z6gHXIHcmxT3ulYjFvzD4
++i5wNyVHquvYQPqaknKJlCWuhjVUWZIH89lrc5hVA/xxYX0pV7mcN+6HwI65qSva
+pb2kFpCHLbXAmfZcjOT2LiNFNPp01gJSA56T5b5oXEvdgs38jUdOKioqVCy0jnVH
+RP5r3N24I9me1aXeQLhwR+jr2mCJP6gWwfiA2lyfxyuKeKrc7tcRoG0YAu2iSEvv
+QIMalBBaPmIVgVfTcJOUXPAg7kq9F60fqMkZ96h//7Gmt1rxTbeOKXctTOOGMNsz
+WNOKNKxb6/Udrme/ZQ1mxLXu2ZQeusNGA3FXZiZbIQKBgQDfhm15GWDQSnQBFk7O
+Iqthz3hAhS3c9u9g+OUY/jlRYVKRLad3IehIkG7V8wh175TxiNGKyy/dCQl6PZkw
+Km/9daH/W+SP3OWab/jJjYZD1gOkMBoexhyxZbm5qJnNyNdJiJWbkrt4HQ5+sEPU
+9Nrh5h4iGT4l9MZgHlHnEx9JkQKBgQDJQmbS1EPGNlK3sYyMa3/bI4mcyQEL58hY
++WoS3qEw23bAcFiT4GlX0KpDuQriP5cgBPdX9gmCMY96rf+T/zoCa1iqs5HAI/S+
+q7RmJK2/MPU7Z0SpykkVeMXamQ4azVGnrFJ1GeyiD+xQKfUrtF1Ex/ahTydh1We8
+SPOZcEkO6wKBgQClTFMOt/7JahXJbAbRGABnb7b898AH5TD3JHi/d9lJXlBh/kIW
+rqOJbg4Y+AYsuQULbWOQYVw++Fzi4kSzwt5YsLIhFoK7BN9iyyVPX/KHne/Jbq0S
+Tu2PHqwvKQi8jqbuwSvqBaPPWqWKeK1hAcYQQk3MZ6B3D0HYePOWj6SWkQKBgEwO
+wwsD2sUKfIIdIA9lBMGNEZFlyPZ11poBT9vntKThG2SoUGE6GrVsDxxezsUn4PXh
+ypO8UGWaUy26me6VMpf9d1mzWO5y6CgyfY9oZxzs5JBZe3JrFul9ZdAxrUnls+kY
+z2SfsnSgbd7xrEyi8ehvZT4ayrhHTNez/hNLguCXAoGAe1S4HhwBgRUpgeCUndo5
+hyC+P/1QkyqWRqTbtUmPpimuj4cW6SMTkPcfiF0csWLTLxumtelxp94kjKF9m5G+
+lYcxTJxUN3M5AK+SFlx5U56+KifHdus+86UTg+jUUE0YaaB1McEvJYk77k2A4SfW
+lqnnF9f+ILqo1O3MGP9A1eo=
+-----END PRIVATE KEY-----'''
 ########################################################################
 class BcexGateway(VtGateway):
     """BCEX接口"""
@@ -68,8 +96,9 @@ class BcexGateway(VtGateway):
         # 解析json文件
         setting = json.load(f)
         try:
-            apiKey = str(setting['apiKey'])
-            secretKey = str(setting['secretKey'])
+            apiKey = setting['apiKey']
+            #secretKey = str(setting['secretKey'])
+
             symbols = setting['symbols']
         except KeyError:
             log = VtLogData()
@@ -110,8 +139,8 @@ class BcexGateway(VtGateway):
 
         if self.qryEnabled:
             self.qryFunctionList = [
-                                    self.restApi.qryMarketData,
-                                    self.restApi.qryAccount,
+                                    #self.restApi.qryMarketData,
+                                    #self.restApi.qryAccount,
                                     self.restApi.qryOrder
             ]
             # 需要循环的查询函数列表
@@ -153,14 +182,16 @@ class BcexGateway(VtGateway):
     # ----------------------------------------------------------------------
     def get_depth(self, symbol, number):
         """创建一个查询深度函数,以供对敲左右手策略使用"""
-        api_url = 'https://www.bcex.top/Api_Order/depth'
+        api_url = 'https://api.bcex.vip/api_market/market/depth'
         req = {
-            'symbol': symbol
+            'token': 'PTT',
+            'market':'ETH'
+
         }
 
         payload = urlencode(req)
         session = requests.Session()
-        resp = session.request('POST', api_url, params=payload)
+        resp = session.request('GET', api_url, params=payload)
         data = resp.json()
 
         d = {}
@@ -229,14 +260,18 @@ class RestApi(BcexRestApi):
         orderID = str(self.localID)
         vtOrderID = '.'.join([self.gatewayName, orderID])
         req = {
-            'api_key': self._api_key,
-            'symbol': orderReq.symbol,
+            'api_key':self._api_key,
+            'token': orderReq.symbol,
             'type': directionMap[orderReq.direction],
-            'price': str(round(orderReq.price, 8)),
-            'number': str(int(orderReq.volume))
-        }
+            'price': '%.8f'%orderReq.price,
+            #'price': '0.00000135',
+            #'amount': '3000',
+            'amount':'%d'%orderReq.volume,
+            'market_type':'1',
+            'market':'ETH'
+            }
 
-        reqid = self.addReq('POST', '/coinTrust', req, self.onSendOrder)
+        reqid = self.addReq('POST', '/placeOrder', req, self.onSendOrder)
 
         # 缓存委托数据对象
         order = VtOrderData()
@@ -265,11 +300,11 @@ class RestApi(BcexRestApi):
             order = self.orderDict[sysID]
 
             req = {
-                'api_key': self._api_key,
-                'symbol': order.symbol,
-                'order_id': sysID
+
+                'order_nos': sysID,
+                'api_key': self._api_key
             }
-            self.addReq('POST', '/cancel', req, self.onCancelOrder)
+            self.addReq('POST', '/cancelOrder', req, self.onCancelOrder)
         else:
             self.cancelDict[localID] = cancelOrderReq
 
@@ -286,19 +321,21 @@ class RestApi(BcexRestApi):
         for symbol in self.symbols:
             for sysID in self.workingOrderDict:
                 req = {
-                    'api_key': self._api_key,
-                    'symbol': symbol,
-                    'trust_id': sysID
+                    'order_no': sysID,
+                    'api_key': self._api_key
                 }
-                self.addReq('POST', '/orderInfo', req, self.onQryOrder)
+                #print("qryOrder #:",sysID)
+                self.addReq('POST', '/getOrderByOrderNo', req, self.onQryOrder)
 
     #----------------------------------------------------------------------
     def qryAccount(self):
         """"""
         for symbol in self.symbols:
             req = {'api_key': self._api_key,
+                   'page':'2',
+                   'size':'50'
                    }
-        self.addReq('POST', '/userBalance', req, self.onQryAccount)
+        self.addReq('POST', '/getBalance', req, self.onQryAccount)
 
     #----------------------------------------------------------------------
     def qryDepth(self):
@@ -330,10 +367,10 @@ class RestApi(BcexRestApi):
         """"""
         order = self.reqOrderDict[reqid]
         localID = order.orderID
-        sysID = data['data']['order_id']
-
+        sysID = data['data']['order_no']
+        print("onSendOrder: sysID:", sysID)
         self.workingOrderDict[sysID] = order
-
+        #print(self.workingOrderDict)
         self.localSysDict[localID] = sysID
         self.orderDict[sysID] = order
         self.gateway.onOrder(order)
@@ -386,8 +423,8 @@ class RestApi(BcexRestApi):
             order = VtOrderData()
             order.gatewayName = self.gatewayName
 
-            coin_from = str(data['data']['coin_from'])
-            coin_to = str(data['data']['coin_to'])
+            coin_from = str(data['data']['token'])
+            coin_to = str(data['data']['market'])
             # order.symbol = str(coin_from + coin_to)
             order.symbol = str(coin_from + '2' + coin_to)
 
@@ -403,15 +440,16 @@ class RestApi(BcexRestApi):
 
             # order.direction = directionMapReverse[d['type'].split('-')[0]]
             order.price = float(data['data']['price'])
-            order.totalVolume = float(data['data']['number'])
+            order.totalVolume = float(data['data']['amount'])
 
-            dt = datetime.fromtimestamp(int(d['created']) / 1000)
-            order.orderTime = dt.strftime('%H:%M:%S')
+            # dt = datetime.fromtimestamp(int(d['created']) / 1000)
+            # order.orderTime = dt.strftime('%H:%M:%S')
+            order.orderTime = data['data']['created_at']
 
             self.orderDict[sysID] = order
             orderUpdated = True
 
-        newTradedVolume = float(data['data']['numberdeal'])
+        newTradedVolume = float(data['data']['matched_amount'])
         newStatus = statusMapReverse[int(data['data']['status'])]
 
         if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
@@ -425,7 +463,7 @@ class RestApi(BcexRestApi):
         order.status = newStatus
 
         # delect the id in WorkingOrderDict after u qry it
-        if(data['data']['status'] == '3'):
+        if(data['data']['status'] == 3 or data['data']['status'] ==0):
             self.workingOrderDict.pop(trust_id)
 
         # 若有更新才推送
