@@ -87,6 +87,10 @@ class BcexGateway(VtGateway):
         # 初始化并启动查询
         self.initQuery()
 
+    def getAccount(self):
+        """"""
+        return 1
+
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
         """订阅行情"""

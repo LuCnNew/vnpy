@@ -209,8 +209,8 @@ class TradeApi(object):
     def processReq(self, req):
         """处理请求"""
         path, params, func, callback, reqid = req
-        if "symbols" in path:
-            print(path)
+        # if "symbols" in path:
+        #     print(path)
 
         result, data = func(path, params)
 

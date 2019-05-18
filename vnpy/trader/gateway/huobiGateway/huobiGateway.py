@@ -1,5 +1,4 @@
 # encoding: UTF-8
-
 '''
 vn.sec的gateway接入
 '''
@@ -40,7 +39,7 @@ class HuobiGateway(VtGateway):
     """火币接口"""
 
     # ----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='HUOBI', config_dict= None):
+    def __init__(self, eventEngine, gatewayName='HUOBI', config_dict=None):
         """Constructor"""
         super(HuobiGateway, self).__init__(eventEngine, gatewayName)
 
@@ -113,7 +112,7 @@ class HuobiGateway(VtGateway):
         """查询委托、成交、持仓"""
         self.tradeApi.qryOrder()
         # self.tradeApi.qryTrade()
-        self.tradeApi.qryPosition()
+        # self.tradeApi.qryPosition()
 
     # ----------------------------------------------------------------------
     def close(self):
@@ -168,10 +167,7 @@ class HuobiGateway(VtGateway):
     def get_depth(self, symbol, number):
         """创建一个查询深度函数,以供对敲左右手策略使用"""
         api_url = 'https://api.huobipro.com/market/depth?'
-        req = {
-            'symbol': symbol,
-            'type': 'step0'
-        }
+        req = {'symbol': symbol, 'type': 'step0'}
 
         payload = urlencode(req)
         session = requests.Session()
@@ -183,6 +179,9 @@ class HuobiGateway(VtGateway):
         d['bids'] = data['tick']['bids']
         return d
 
+    #----------------------------------------------------------------------
+    def getAccount(self):
+        return self.tradeApi.accountid
 
 ########################################################################
 class HuobiDataApi(DataApi):
@@ -199,7 +198,7 @@ class HuobiDataApi(DataApi):
         self.connectionStatus = False  # 连接状态
 
         self.tickDict = {}
-        self.lastPrice1=0
+        self.lastPrice1 = 0
 
         # self.subscribeDict = {}
 
@@ -332,9 +331,7 @@ class HuobiDataApi(DataApi):
         if tick.lastPrice:
             newtick = copy(tick)
             self.gateway.onTick(tick)
-        self.lastPrice1=tick.lastPrice
-
-
+        self.lastPrice1 = tick.lastPrice
 
     # ----------------------------------------------------------------------
     def onMarketDetail(self, data):
@@ -378,7 +375,7 @@ class HuobiTradeApi(TradeApi):
 
         self.connectionStatus = False  # 连接状态
         # self.accountid = '5065491'
-        self.accountid = '4547480'
+        self.accountid = None
 
         self.orderDict = {}  # 缓存委托数据的字典
         self.symbols = []  # 所有交易代码的字符串集合
@@ -394,7 +391,7 @@ class HuobiTradeApi(TradeApi):
         self.orderLocalDict = {}  # 交易所委托编号和本地委托编号映射
         self.cancelReqDict = {}  # 撤单请求字典
         # self.activeOrderSet = set() # 活动委托集合
-        self.xuyao=[]
+        self.xuyao = []
 
     # ----------------------------------------------------------------------
     def connect(self, exchange, symbols, accessKey, secretKey):
@@ -432,7 +429,8 @@ class HuobiTradeApi(TradeApi):
         statesActive = 'submitted,partial-filled'
 
         for symbol in self.symbols:
-            self.getOrders(symbol, statesAll, startDate=todayDate)  # 查询今日所有状态的委托
+            self.getOrders(symbol, statesAll,
+                           startDate=todayDate)  # 查询今日所有状态的委托
             # comment qry statesActive orders , qry too much will influence internet bandwidth maybe cause some error
             # self.getOrders(symbol, statesActive, endDate=yesterdayDate)  # 查询昨日往前所有未结束的委托
 
@@ -446,7 +444,8 @@ class HuobiTradeApi(TradeApi):
         todayDate = now.strftime('%Y-%m-%d')
 
         for symbol in self.symbols:
-            self.getMatchResults(symbol, startDate=todayDate, size=50)  # 只查询今日最新50笔成交
+            self.getMatchResults(symbol, startDate=todayDate,
+                                 size=50)  # 只查询今日最新50笔成交
 
     # ----------------------------------------------------------------------
     def sendOrder(self, orderReq):
@@ -460,12 +459,21 @@ class HuobiTradeApi(TradeApi):
         else:
             type_ = 'sell-limit'
 
-        reqid = self.placeOrder(self.accountid,
-                                str(round(orderReq.volume, 4)),
-                                orderReq.symbol,
-                                type_,
-                                price=str(round(orderReq.price, 6)),
-                                source='api')
+        if len(orderReq.symbol) == 7: #difference smteth and smtusdt by len()
+
+            reqid = self.placeOrder(self.accountid,
+                                    str(round(orderReq.volume)),
+                                    orderReq.symbol,
+                                    type_,
+                                    price=str(round(orderReq.price, 6)),
+                                    source='api')
+        else:
+            reqid = self.placeOrder(self.accountid,
+                                    str(round(orderReq.volume)),
+                                    orderReq.symbol,
+                                    type_,
+                                    price=str(round(orderReq.price, 8)),
+                                    source='api')   
 
         self.reqLocalDict[reqid] = localid
 
@@ -517,7 +525,8 @@ class HuobiTradeApi(TradeApi):
             contract.exchange = EXCHANGE_HUOBI
             contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
 
-            contract.name = '/'.join([d['base-currency'].upper(), d['quote-currency'].upper()])
+            contract.name = '/'.join(
+                [d['base-currency'].upper(), d['quote-currency'].upper()])
             contract.priceTick = 1 / pow(10, d['price-precision'])
             contract.size = 1 / pow(10, d['amount-precision'])
             contract.productClass = PRODUCT_SPOT
@@ -560,7 +569,8 @@ class HuobiTradeApi(TradeApi):
                 account = VtAccountData()
                 account.gatewayName = self.gatewayName
                 account.accountID = d['currency']
-                account.vtAccountID = '.'.join([account.gatewayName, account.accountID])
+                account.vtAccountID = '.'.join(
+                    [account.gatewayName, account.accountID])
 
                 accountDict[currency] = account
 
@@ -628,7 +638,8 @@ class HuobiTradeApi(TradeApi):
 
                 order.price = float(d['price'])
                 order.totalVolume = float(d['amount'])
-                order.orderTime = datetime.fromtimestamp(d['created-at'] / 1000).strftime('%H:%M:%S')
+                order.orderTime = datetime.fromtimestamp(
+                    d['created-at'] / 1000).strftime('%H:%M:%S')
 
                 if 'buy' in d['type']:
                     order.direction = DIRECTION_LONG
@@ -640,7 +651,8 @@ class HuobiTradeApi(TradeApi):
 
             # 数据更新，只有当成交数量或者委托状态变化时，才执行推送
             if d['canceled-at']:
-                order.cancelTime = datetime.fromtimestamp(d['canceled-at'] / 1000).strftime('%H:%M:%S')
+                order.cancelTime = datetime.fromtimestamp(
+                    d['canceled-at'] / 1000).strftime('%H:%M:%S')
 
             newTradedVolume = float(d['field-amount'])
             newStatus = statusMapReverse.get(d['state'], STATUS_UNKNOWN)

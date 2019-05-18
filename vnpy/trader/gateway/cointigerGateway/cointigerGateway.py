@@ -38,6 +38,7 @@ class CointigerGateway(VtGateway):
         super(CointigerGateway, self).__init__(eventEngine, gatewayName)
 
         self.restApi = RestApi(self)
+        # self.accountid = '000001'
 
         self.qryEnabled = False         # 是否要启动循环查询
 
@@ -150,6 +151,13 @@ class CointigerGateway(VtGateway):
     def setQryEnabled(self, qryEnabled):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
+
+
+    #----------------------------------------------------------------------
+    def getAccount(self):
+        """"""
+        return 1
+
 
     def get_depth(self, symbol, number):
         """创建一个查询深度函数,以供对敲左右手策略使用"""
@@ -359,6 +367,7 @@ class RestApi(CointigerRestApi):
                    'time': int(time.time())
                    }
         self.addReq('GET', '/user/balance?', req, self.onQryAccount)
+
 
     #----------------------------------------------------------------------
     def qryDepth(self):
