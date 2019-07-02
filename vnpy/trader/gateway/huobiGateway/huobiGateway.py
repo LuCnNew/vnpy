@@ -39,7 +39,11 @@ class HuobiGateway(VtGateway):
     """火币接口"""
 
     # ----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='HUOBI', config_dict=None):
+    def __init__(self,
+                 eventEngine,
+                 gatewayName='HUOBI',
+                 config_dict=None,
+                 symbol=''):
         """Constructor"""
         super(HuobiGateway, self).__init__(eventEngine, gatewayName)
 
@@ -51,8 +55,10 @@ class HuobiGateway(VtGateway):
 
         self.qryEnabled = False  # 是否要启动循环查询
 
+        self.symbol = symbol
+
         if config_dict == None:
-            self.fileName = self.gatewayName + '_connect.json'
+            self.fileName = self.gatewayName + '_' + self.symbol + '_connect.json'
             self.filePath = getJsonPath(self.fileName, __file__)
         else:
             self.fileName = config_dict['file_name']
@@ -76,7 +82,7 @@ class HuobiGateway(VtGateway):
             exchange = str(setting['exchange'])
             accessKey = str(setting['accessKey'])
             secretKey = str(setting['secretKey'])
-            symbols = setting['symbols']
+            symbols = [self.symbol]
         except KeyError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
@@ -182,6 +188,7 @@ class HuobiGateway(VtGateway):
     #----------------------------------------------------------------------
     def getAccount(self):
         return self.tradeApi.accountid
+
 
 ########################################################################
 class HuobiDataApi(DataApi):
@@ -459,7 +466,8 @@ class HuobiTradeApi(TradeApi):
         else:
             type_ = 'sell-limit'
 
-        if len(orderReq.symbol) == 7: #difference smteth and smtusdt by len()
+        if len(orderReq.symbol) == 7:
+            #difference smteth and smtusdt by len()
 
             reqid = self.placeOrder(self.accountid,
                                     str(round(orderReq.volume)),
@@ -473,7 +481,7 @@ class HuobiTradeApi(TradeApi):
                                     orderReq.symbol,
                                     type_,
                                     price=str(round(orderReq.price, 8)),
-                                    source='api')   
+                                    source='api')
 
         self.reqLocalDict[reqid] = localid
 

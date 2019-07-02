@@ -1,5 +1,4 @@
 # encoding: UTF-8
-
 '''
 vnpy.api.fcoin的gateway接入
 '''
@@ -40,7 +39,7 @@ class FcoinGateway(VtGateway):
     """FCOIN接口"""
 
     # ----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='', config_dict= None):
+    def __init__(self, eventEngine, gatewayName='', config_dict=None):
         """Constructor"""
         super(FcoinGateway, self).__init__(eventEngine, gatewayName)
 
@@ -114,12 +113,12 @@ class FcoinGateway(VtGateway):
         """初始化连续查询"""
         if self.qryEnabled:
             # 需要循环的查询函数列表
-            self.qryFunctionList = [#self.restApi.qryPosition,
-                                    self.restApi.qryOrderSubmitted,
-                                    self.restApi.qryOrderPartialFilled,
-                                    self.restApi.qryOrderCanceled,
-                                    self.restApi.qryOrderFilled,
-                                    self.restApi.qryOrderPartialCanceled]
+            self.qryFunctionList = [  #self.restApi.qryPosition,
+                self.restApi.qryOrderSubmitted,
+                self.restApi.qryOrderPartialFilled,
+                self.restApi.qryOrderCanceled, self.restApi.qryOrderFilled,
+                self.restApi.qryOrderPartialCanceled
+            ]
 
             self.qryCount = 0  # 查询触发倒计时
             self.qryTrigger = 3  # 查询触发点
@@ -154,6 +153,10 @@ class FcoinGateway(VtGateway):
     def setQryEnabled(self, qryEnabled):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
+
+    # ----------------------------------------------------------------------
+    def getAccount(self):
+        return 1
 
 
 ########################################################################
@@ -215,7 +218,6 @@ class RestApi(FcoinRestApi):
 
         reqid = self.addReq('POST', '/orders', self.onSendOrder, postdict=req)
 
-
         # 缓存委托数据对象
         order = VtOrderData()
         order.gatewayName = self.gatewayName
@@ -254,11 +256,7 @@ class RestApi(FcoinRestApi):
     def qryOrder(self, state):
         """"""
         for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'states': state,
-                'limit': 50
-            }
+            req = {'symbol': symbol, 'states': state, 'limit': 50}
             self.addReq('GET', '/orders', self.onQryOrder, params=req)
 
     # ----------------------------------------------------------------------
@@ -368,7 +366,8 @@ class RestApi(FcoinRestApi):
             newTradedVolume = float(d['filled_amount'])
             newStatus = statusMapReverse[d['state']]
 
-            if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
+            if newTradedVolume != float(
+                    order.tradedVolume) or newStatus != order.status:
                 orderUpdated = True
 
             if newTradedVolume != float(order.tradedVolume):
@@ -412,7 +411,8 @@ class RestApi(FcoinRestApi):
             account.gatewayName = self.gatewayName
 
             account.accountID = d['currency']
-            account.vtAccountID = '.'.join([account.gatewayName, account.accountID])
+            account.vtAccountID = '.'.join(
+                [account.gatewayName, account.accountID])
             account.balance = float(d['balance'])
             account.available = account.balance - float(d['frozen'])
 
@@ -486,17 +486,13 @@ class WebsocketApi(FcoinWebsocketApi):
             tick.vtSymbol = '.'.join([tick.symbol, tick.exchange])
             self.tickDict[symbol] = tick
 
-        req = {
-            'cmd': 'sub',
-            'args': l,
-            'id': 1
-        }
+        req = {'cmd': 'sub', 'args': l, 'id': 1}
         self.sendReq(req)
 
     # ----------------------------------------------------------------------
     def onData(self, data):
         """数据回调"""
-        if('type' in data):
+        if ('type' in data):
             type_ = data['type']
             if 'hello' in type_:
                 self.subscribe()

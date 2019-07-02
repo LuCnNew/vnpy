@@ -1,5 +1,4 @@
 # encoding: UTF-8
-
 '''
 vnpy.api.lhang的gateway接入
 '''
@@ -23,7 +22,7 @@ import requests
 directionMap = {}
 directionMap[DIRECTION_LONG] = 'buy'
 directionMap[DIRECTION_SHORT] = 'sell'
-directionMapReverse = {v:k for k,v in directionMap.items()}
+directionMapReverse = {v: k for k, v in directionMap.items()}
 
 statusMapReverse = {}
 statusMapReverse[0] = STATUS_NOTTRADED
@@ -38,13 +37,13 @@ class LbankGateway(VtGateway):
     """LBANK接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='', config_dict= None):
+    def __init__(self, eventEngine, gatewayName='', config_dict=None):
         """Constructor"""
         super(LbankGateway, self).__init__(eventEngine, gatewayName)
 
         self.restApi = RestApi(self)
 
-        self.qryEnabled = False         # 是否要启动循环查询
+        self.qryEnabled = False  # 是否要启动循环查询
 
         if config_dict == None:
             self.fileName = self.gatewayName + '_connect.json'
@@ -109,15 +108,15 @@ class LbankGateway(VtGateway):
         """初始化连续查询"""
         if self.qryEnabled:
             # 需要循环的查询函数列表
-            self.qryFunctionList = [#self.restApi.qryAccount,
-                                    #self.restApi.qryWorkingOrder,
-                                    self.restApi.qryCompletedOrder,
-                                    #self.restApi.qryMarketData
-                                    ]
+            self.qryFunctionList = [  #self.restApi.qryAccount,
+                #self.restApi.qryWorkingOrder,
+                self.restApi.qryCompletedOrder,
+                #self.restApi.qryMarketData
+            ]
 
-            self.qryCount = 0           # 查询触发倒计时
-            self.qryTrigger = 1         # 查询触发点
-            self.qryNextFunction = 0    # 上次运行的查询函数索引
+            self.qryCount = 0  # 查询触发倒计时
+            self.qryTrigger = 1  # 查询触发点
+            self.qryNextFunction = 0  # 上次运行的查询函数索引
 
             self.startQuery()
 
@@ -155,10 +154,7 @@ class LbankGateway(VtGateway):
 
         api_url = 'https://www.lbkex.net/v1/depth.do'
 
-        req = {
-            'symbol': 'ptt_eth',
-            'size': '5'
-        }
+        req = {'symbol': 'ptt_eth', 'size': '5'}
 
         payload = urlencode(req)
 
@@ -177,6 +173,8 @@ class LbankGateway(VtGateway):
         except Exception as e:
             self.onError(type(e), e.message)
 
+    def getAccount(self):
+        return 1
 
 
 ########################################################################
@@ -188,18 +186,18 @@ class RestApi(LbankRestApi):
         """Constructor"""
         super(RestApi, self).__init__()
 
-        self.gateway = gateway                  # gateway对象
+        self.gateway = gateway  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
 
         self.localID = 0
         self.tradeID = 0
 
-        self.orderDict = {}         # sysID:order
-        self.localSysDict = {}      # localID:sysID
-        self.reqOrderDict = {}      # reqID:order
-        self.cancelDict = {}        # localID:req
+        self.orderDict = {}  # sysID:order
+        self.localSysDict = {}  # localID:sysID
+        self.reqOrderDict = {}  # reqID:order
+        self.cancelDict = {}  # localID:req
 
-        self.tickDict = {}          # symbol:tick
+        self.tickDict = {}  # symbol:tick
         self.reqSymbolDict = {}
 
     #----------------------------------------------------------------------
@@ -261,15 +259,13 @@ class RestApi(LbankRestApi):
         self.reqOrderDict[reqid] = order
 
         return vtOrderID
+
     #----------------------------------------------------------------------
 
     def qryDepth(self):
         """"""
         for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'size': '5'
-            }
+            req = {'symbol': symbol, 'size': '5'}
             i = self.addReq('GET', '/depth.do', req, self.onQryDepth)
             self.reqSymbolDict[i] = symbol
 
@@ -281,10 +277,7 @@ class RestApi(LbankRestApi):
         if localID in self.localSysDict:
             sysID = self.localSysDict[localID]
             order = self.orderDict[sysID]
-            req = {
-                'symbol': order.symbol,
-                'order_id': sysID
-            }
+            req = {'symbol': order.symbol, 'order_id': sysID}
             self.addReq('POST', '/cancel_order.do', req, self.onCancelOrder)
 
         else:
@@ -299,23 +292,17 @@ class RestApi(LbankRestApi):
     def qryCompletedOrder(self):
         """"""
         for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'current_page': '1',
-                'page_length': '100'
-            }
-            self.addReq('POST', '/orders_info_history.do', req, self.onQryOrder)
+            req = {'symbol': symbol, 'current_page': '1', 'page_length': '100'}
+            self.addReq('POST', '/orders_info_history.do', req,
+                        self.onQryOrder)
 
     #----------------------------------------------------------------------
     def qryWorkingOrder(self):
         """"""
         for symbol in self.symbols:
-            req = {
-                'symbol': symbol,
-                'current_page': '1',
-                'page_length': '100'
-            }
-            self.addReq('POST', '/orders_info_no_deal.do', req, self.onQryOrder)
+            req = {'symbol': symbol, 'current_page': '1', 'page_length': '100'}
+            self.addReq('POST', '/orders_info_no_deal.do', req,
+                        self.onQryOrder)
 
     #----------------------------------------------------------------------
     def qryAccount(self):
@@ -323,7 +310,6 @@ class RestApi(LbankRestApi):
         self.addReq('POST', '/user_info.do', {}, self.onQryAccount)
 
     #----------------------------------------------------------------------
-
 
     #----------------------------------------------------------------------
     def qryTicker(self):
@@ -365,7 +351,7 @@ class RestApi(LbankRestApi):
     #----------------------------------------------------------------------
     def onError(self, code, error):
         """"""
-        msg = u'发生异常，错误代码：%s，错误信息：%s' %(code, error)
+        msg = u'发生异常，错误代码：%s，错误信息：%s' % (code, error)
         self.writeLog(msg)
 
     #----------------------------------------------------------------------
@@ -406,7 +392,7 @@ class RestApi(LbankRestApi):
                 order.price = float(d['price'])
                 order.totalVolume = float(d['amount'])
 
-                dt = datetime.fromtimestamp(d['create_time']/1000)
+                dt = datetime.fromtimestamp(d['create_time'] / 1000)
                 order.orderTime = dt.strftime('%H:%M:%S')
 
                 self.orderDict[sysID] = order
@@ -416,7 +402,8 @@ class RestApi(LbankRestApi):
             newTradedVolume = float(d['deal_amount'])
             newStatus = statusMapReverse[d['status']]
 
-            if newTradedVolume != float(order.tradedVolume) or newStatus != order.status:
+            if newTradedVolume != float(
+                    order.tradedVolume) or newStatus != order.status:
                 orderUpdated = True
 
             if newTradedVolume != float(order.tradedVolume):
@@ -465,7 +452,8 @@ class RestApi(LbankRestApi):
             account.gatewayName = self.gatewayName
 
             account.accountID = currency
-            account.vtAccountID = '.'.join([self.gatewayName, account.accountID])
+            account.vtAccountID = '.'.join(
+                [self.gatewayName, account.accountID])
             account.balance = float(asset[currency])
             account.available = float(free[currency])
 
@@ -503,7 +491,7 @@ class RestApi(LbankRestApi):
         tick.lastPrice = float(ticker['latest'])
         tick.volume = float(ticker['vol'])
 
-        tick.datetime = datetime.fromtimestamp(int(data['timestamp']/1000))
+        tick.datetime = datetime.fromtimestamp(int(data['timestamp'] / 1000))
         tick.date = tick.datetime.strftime('%Y%m%d')
         tick.time = tick.datetime.strftime('%H:%M:%S')
 
@@ -533,6 +521,7 @@ class RestApi(LbankRestApi):
 
         if tick.lastPrice:
             self.gateway.onTick(copy(tick))
+
 
 ########################################################################
 class WebsocketApi(LbankWebsocketApi):
@@ -571,16 +560,13 @@ class WebsocketApi(LbankWebsocketApi):
             tick.exchange = EXCHANGE_LBANK
             tick.vtSymbol = '.'.join([tick.symbol, tick.exchange])
 
-            channelDepth = 'lh_sub_spot_%s_depth_20' %symbol
+            channelDepth = 'lh_sub_spot_%s_depth_20' % symbol
             #channelTrades = 'lh_sub_spot_%s_ticker' %symbol
             self.channelTickDict[channelDepth] = tick
-           # self.channelTickDict[channelTrades] = tick
+            # self.channelTickDict[channelTrades] = tick
 
-            for channel in [channelDepth]: #, channelTrades]:
-                req = {
-                    'event': 'addChannel',
-                    'channel': channel
-                }
+            for channel in [channelDepth]:  #, channelTrades]:
+                req = {'event': 'addChannel', 'channel': channel}
                 self.sendReq(req)
 
     #----------------------------------------------------------------------
@@ -616,7 +602,7 @@ class WebsocketApi(LbankWebsocketApi):
 
         fill = data['data'][0]
         tick.lastPrice = float(fill[0])
-        tick.datetime = datetime.fromtimestamp(int(fill[2])/1000)
+        tick.datetime = datetime.fromtimestamp(int(fill[2]) / 1000)
         tick.date = tick.datetime.strftime('%Y%m%d')
         tick.time = tick.datetime.strftime('%H:%M:%S')
 
@@ -649,9 +635,8 @@ class WebsocketApi(LbankWebsocketApi):
 
         tick.lastPrice = (tick.askPrice1 + tick.askPrice2) / 2
 
-        tick.datetime = datetime.fromtimestamp(d['timestamp']/1000)
+        tick.datetime = datetime.fromtimestamp(d['timestamp'] / 1000)
         tick.date = tick.datetime.strftime('%Y%m%d')
         tick.time = tick.datetime.strftime('%H:%M:%S')
 
         self.gateway.onTick(copy(tick))
-
