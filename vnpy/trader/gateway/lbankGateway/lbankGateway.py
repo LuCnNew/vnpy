@@ -163,7 +163,6 @@ class LbankGateway(VtGateway):
             session = requests.Session()
             resp = session.request('GET', api_url, params=payload)
             data = resp.json()
-            print(data)
 
             d = {}
             d['asks'] = data['asks']
