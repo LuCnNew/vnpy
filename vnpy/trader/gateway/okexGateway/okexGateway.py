@@ -15,6 +15,7 @@ from threading import Condition
 from queue import Queue, Empty
 from threading import Thread
 from time import sleep
+import requests
 
 from vnpy.api.okex import OkexSpotApi, OKEX_SPOT_HOST
 from vnpy.trader.vtGateway import *
@@ -43,25 +44,32 @@ class OkexGateway(VtGateway):
     """OKEX交易接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='OKEX'):
+    def __init__(self,
+                 eventEngine,
+                 gatewayName='OKEX',
+                 symbol='',
+                 config_dict=None):
         """Constructor"""
         super(OkexGateway, self).__init__(eventEngine, gatewayName)
-
+        self.symbol = symbol
         self.spotApi = SpotApi(self)
         # self.api_contract = Api_contract(self)
 
         self.leverage = 0
         self.connected = False
-
-        self.fileName = self.gatewayName + '_connect.json'
-        self.filePath = getJsonPath(self.fileName, __file__)
+        if config_dict == None:
+            self.fileName = self.gatewayName + '_' + self.symbol + '_connect.json'
+            self.filePath = getJsonPath(self.fileName, __file__)
+        else:
+            self.fileName = config_dict['file_name']
+            self.filePath = getJsonPath(self.fileName, __file__)
 
     #----------------------------------------------------------------------
     def connect(self):
         """连接"""
         # 载入json文件
         try:
-            f = file(self.filePath)
+            f = open(self.filePath)
         except IOError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
@@ -74,7 +82,7 @@ class OkexGateway(VtGateway):
         try:
             apiKey = str(setting['apiKey'])
             secretKey = str(setting['secretKey'])
-            trace = setting['trace']
+            passphrase = setting['passphrase']
             symbols = setting['symbols']
         except KeyError:
             log = VtLogData()
@@ -84,7 +92,7 @@ class OkexGateway(VtGateway):
             return
 
         # 初始化接口
-        self.spotApi.init(apiKey, secretKey, trace, symbols)
+        self.spotApi.init(apiKey, secretKey, passphrase, symbols)
 
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
@@ -158,20 +166,17 @@ class OkexGateway(VtGateway):
         self.qryEnabled = qryEnabled
 
     #----------------------------------------------------------------------
-    def get_depth(self, symbol, number):
-        """创建一个查询深度函数,以供对敲左右手策略使用"""
-        api_url = 'https://api.huobipro.com/market/depth?'
-        req = {'symbol': symbol, 'type': 'step0'}
-
-        payload = urlencode(req)
-        session = requests.Session()
-        resp = session.request('GET', api_url, params=payload)
+    def get_depth(self, symbol, size='5', depth=''):
+        url = 'https://www.okex.com'
+        SPOT_DEPTH = '/api/spot/v3/instruments/'
+        symbol = symbol.upper()
+        url = url + SPOT_DEPTH + 'GNX-ETH' + '/book?' + 'size=5'
+        # session = requests.Session()
+        resp = requests.get(url, params='')
         data = resp.json()
-
         d = {}
-        d['asks'] = data['tick']['asks']
-        d['bids'] = data['tick']['bids']
-        return d
+
+        return
 
     #----------------------------------------------------------------------
     def getAccount(self):
