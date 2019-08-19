@@ -39,17 +39,22 @@ class FcoinGateway(VtGateway):
     """FCOIN接口"""
 
     # ----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='', config_dict=None):
+    def __init__(self,
+                 eventEngine,
+                 gatewayName='',
+                 config_dict=None,
+                 symbol=''):
         """Constructor"""
         super(FcoinGateway, self).__init__(eventEngine, gatewayName)
 
         self.restApi = RestApi(self)
         self.wsApi = WebsocketApi(self)
+        self.symbol = symbol
 
         self.qryEnabled = False  # 是否要启动循环查询
 
         if config_dict == None:
-            self.fileName = self.gatewayName + '_connect.json'
+            self.fileName = self.gatewayName + '_' + self.symbol + '_connect.json'
             self.filePath = getJsonPath(self.fileName, __file__)
         else:
             self.fileName = config_dict['file_name']
@@ -72,7 +77,7 @@ class FcoinGateway(VtGateway):
         try:
             apiKey = str(setting['apiKey'])
             apiSecret = str(setting['apiSecret'])
-            symbols = setting['symbols']
+            symbols = self.symbol
         except KeyError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
